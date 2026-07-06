@@ -1,0 +1,163 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Single source of truth for the Steel Reconciliation Platform frontend. Consumed by theme.ts (MUI createTheme) and tokens.css (CSS custom properties). See design.md for specs and brandguidelines.md for rationale. BRAND-ANCHORED to My Home Group (red + black/ink + white). Neutral-forward premium (Apple/Google discipline): ink + clean zinc-neutral do ~85% of the UI; My Home red is the one confident accent (brand, primary CTA, active, focus, selection). Color is SYSTEMATIC — `ramp` holds Material-3 HCT tonal scales; roles derive from stops (see `_derivation`). Danger uses the logo's DARKER maroon-red (distinct from brand red) + always an icon, so brand-red and alert-red never collide. All `_meta` contrasts meet WCAG 2.2 AA.",
+
+  "ramp": {
+    "_note": "Reference layer. Generated via @material/material-color-utilities (HCT). Seeds: red(brand) #E4002B, danger(maroon) #9A1B1B, steel(info) #2A5A85, success #15803D, warning #A16207; neutral = hue 250 / chroma 2 (crisp zinc-like cool gray). 50=lightest, 950=darkest.",
+    "red":     { "50":"#fff0ef","100":"#ffdedb","200":"#ffbfbb","300":"#ff9a96","400":"#ff6564","500":"#f41934","600":"#d70028","700":"#b2001f","800":"#8e0017","900":"#6c000f","950":"#4c0007" },
+    "neutral": { "50":"#f5f3f4","100":"#e7e5e6","200":"#d0cecf","300":"#b7b5b7","400":"#999899","500":"#7c7c7d","600":"#6b6a6b","700":"#575758","800":"#444445","900":"#323234","950":"#212223" },
+    "steel":   { "50":"#eef4ff","100":"#d5e7ff","200":"#abd2ff","300":"#8dbaea","400":"#709ccb","500":"#5380ad","600":"#406e9a","700":"#2a5a85","800":"#114771","900":"#003559","950":"#00233e" },
+    "success": { "50":"#d2ffd4","100":"#98fba9","200":"#82e494","300":"#69ca7e","400":"#4aab63","500":"#298e49","600":"#0a7b39","700":"#00652c","800":"#005021","900":"#003c17","950":"#00280d" },
+    "warning": { "50":"#fff1e7","100":"#ffe0c3","200":"#ffc385","300":"#f2a64d","400":"#d08933","500":"#af6d16","600":"#9a5c00","700":"#7f4b00","800":"#653b00","900":"#4c2b00","950":"#341c00" },
+    "danger":  { "50":"#fff0ef","100":"#ffdeda","200":"#ffbfb9","300":"#ff9b91","400":"#ff665c","500":"#da4a42","600":"#c23933","700":"#a62522","800":"#8b0e12","900":"#6d0007","950":"#4c0003" }
+  },
+
+  "_derivation": {
+    "_note": "Roles derive from ramp stops. ink = neutral (near-black actions/text); brand = My Home red accent; info = steel (links). Only dark 'subtle' tints are hand-set. Brand CTA fill uses red-600 (white text 5.36:1) — NOT red-500 (fails AA).",
+    "light.ink": "default=neutral tone20, hover=neutral14, active=neutral~10, subtle=neutral100, border=neutral strong",
+    "light.brand": "default=red600, hover=red700, active=red800, subtle=red50, border=red200, text=red700",
+    "light.info": "default=steel700, subtle=steel50, border=steel200",
+    "light.semantics": "default=ramp700, subtle=ramp50 (success calmed), border=ramp200",
+    "light.surface/text": "neutral — app=97, card=#fff, sunken=94, hair=90, strong=80, text primary=14/secondary=40/tertiary=45",
+    "dark": "ink=light neutral fill; brand text=red400 (5.54:1 on card); brand CTA still red600; semantics=ramp300; subtle tints hand-set"
+  },
+
+  "color": {
+    "light": {
+      "surface": { "app": "#F8F6F7", "default": "#FFFFFF", "sunken": "#EFEDEE", "inverse": "#212223" },
+      "border":  { "hairline": "#E4E2E3", "strong": "#C8C6C7", "focus": "#D70028" },
+      "text":    { "primary": "#232425", "secondary": "#5E5E5F", "tertiary": "#6B6A6B", "disabled": "#A1A0A1", "onInk": "#FFFFFF", "onBrand": "#FFFFFF" },
+      "ink":     { "default": "#303031", "hover": "#232425", "active": "#1A1A1B", "subtle": "#E7E5E6", "border": "#C8C6C7" },
+      "brand":   { "default": "#D70028", "hover": "#B2001F", "active": "#8E0017", "subtle": "#FFF0EF", "border": "#FFBFBB", "text": "#B2001F" },
+      "info":    { "default": "#2A5A85", "subtle": "#EEF4FF", "border": "#ABD2FF" },
+      "success": { "default": "#00652C", "subtle": "#E7F4EC", "border": "#82E494" },
+      "warning": { "default": "#7F4B00", "subtle": "#FFF1E7", "border": "#FFC385" },
+      "danger":  { "default": "#A62522", "subtle": "#FFF0EF", "border": "#FFBFB9" },
+      "dataRow": { "stripe": "#FAF9FA", "hover": "#EFEDEE", "selected": "#FFF0EF", "pinnedBg": "#F8F6F7" }
+    },
+    "dark": {
+      "_note": "Deep zinc charcoal; ink buttons become light fills; brand CTA stays red-600; brand text uses red-400; subtle tints hand-set.",
+      "surface": { "app": "#191A1B", "default": "#212223", "sunken": "#131314", "inverse": "#FFFFFF" },
+      "border":  { "hairline": "#373738", "strong": "#4E4D4F", "focus": "#FF6564" },
+      "text":    { "primary": "#EAE7E9", "secondary": "#A7A5A7", "tertiary": "#878687", "disabled": "#5E5E5F", "onInk": "#191A1B", "onBrand": "#FFFFFF" },
+      "ink":     { "default": "#E7E5E6", "hover": "#F5F3F4", "active": "#FFFFFF", "subtle": "#2A2A2C", "border": "#4E4D4F" },
+      "brand":   { "default": "#D70028", "hover": "#F41934", "active": "#FF6564", "subtle": "#2E0F12", "border": "#5A2426", "text": "#FF6564" },
+      "info":    { "default": "#8DBAEA", "subtle": "#17293B", "border": "#2F4A63" },
+      "success": { "default": "#69CA7E", "subtle": "#16271B", "border": "#2C4A34" },
+      "warning": { "default": "#F2A64D", "subtle": "#2A2010", "border": "#4C3A18" },
+      "danger":  { "default": "#FF9B91", "subtle": "#2E1613", "border": "#5A2A26" },
+      "dataRow": { "stripe": "#1E1F20", "hover": "#2A2A2C", "selected": "#2E0F12", "pinnedBg": "#1C1D1E" }
+    }
+  },
+
+  "typography": {
+    "fontFamily": "Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+    "fontFamilyMono": "\"JetBrains Mono\", \"SF Mono\", \"Cascadia Mono\", Consolas, monospace",
+    "numericVariant": "tabular-nums lining-nums",
+    "opticalSizing": "auto",
+    "featureSettings": "'cv11' 1, 'ss01' 1",
+    "scale": {
+      "display":     { "size": 24, "lineHeight": 32, "weight": 600, "tracking": "-0.02em" },
+      "title":       { "size": 20, "lineHeight": 28, "weight": 600, "tracking": "-0.015em" },
+      "h2":          { "size": 16, "lineHeight": 24, "weight": 600, "tracking": "0" },
+      "h3":          { "size": 14, "lineHeight": 20, "weight": 600, "tracking": "0" },
+      "body":        { "size": 14, "lineHeight": 20, "weight": 400, "tracking": "0" },
+      "label":       { "size": 13, "lineHeight": 18, "weight": 500, "tracking": "0" },
+      "caption":     { "size": 12, "lineHeight": 16, "weight": 400, "tracking": "0" },
+      "tableHeader": { "size": 12, "lineHeight": 16, "weight": 600, "tracking": "0.04em", "case": "uppercase" },
+      "num":         { "size": 13, "lineHeight": 20, "weight": 400, "tabular": true },
+      "numStrong":   { "size": 13, "lineHeight": 20, "weight": 600, "tabular": true }
+    }
+  },
+
+  "space": { "0.5": 2, "1": 4, "2": 8, "3": 12, "4": 16, "5": 24, "6": 32, "7": 48, "8": 64 },
+
+  "radius": { "sm": 6, "md": 8, "lg": 10, "cell": 0, "pill": 9999, "_note": "Apple-philosophy: slightly larger, continuous-feel radii on surfaces; data cells stay square (0)." },
+
+  "sizing": {
+    "sidebarExpanded": 240, "sidebarCollapsed": 64, "headerHeight": 56,
+    "controlHeight": 36, "controlHeightSm": 28, "rowHeightDense": 36, "rowHeightComfortable": 44,
+    "contentMaxWidth": 1440, "formMaxWidth": 640, "minHitArea": 40
+  },
+
+  "elevation": {
+    "flat": "none",
+    "card": "0 1px 2px rgba(20, 20, 22, 0.05), 0 6px 16px rgba(20, 20, 22, 0.06)",
+    "raised": "0 1px 2px rgba(20, 20, 22, 0.06), 0 3px 8px rgba(20, 20, 22, 0.07)",
+    "popover": "0 6px 20px rgba(20, 20, 22, 0.14), 0 1px 3px rgba(20, 20, 22, 0.07)",
+    "dialog": "0 20px 48px rgba(20, 20, 22, 0.22), 0 4px 12px rgba(20, 20, 22, 0.12)",
+    "_note": "Apple-philosophy: soft functional elevation defines surfaces (cards float on a barely-there hairline). No decorative or hover-lift shadows."
+  },
+
+  "motion": {
+    "duration": { "instant": "80ms", "fast": "120ms", "base": "180ms", "slow": "240ms" },
+    "easing": { "standard": "cubic-bezier(0.2, 0, 0, 1)", "decelerate": "cubic-bezier(0, 0, 0, 1)", "accelerate": "cubic-bezier(0.4, 0, 1, 1)" },
+    "reducedMotionFallback": "0ms",
+    "_rules": "Animate transform & opacity ONLY. Never `transition: all`. Enter = opacity + translateY(4px); press = scale(0.97). Reduced motion overrides everything (fallback 0ms; opacity-only fades <=120ms permitted)."
+  },
+
+  "focusRing": { "width": 2, "offset": 2, "style": "solid", "colorToken": "border.focus" },
+
+  "breakpoints": { "xs": 0, "sm": 600, "md": 960, "lg": 1280, "xl": 1536 },
+
+  "_designTarget": { "primary": "1366x768 (construction-site laptop)", "note": "The full A-N Abstract (8 dia cols + Total) must fit at 1366 with the sidebar collapsed; the grid owns horizontal scroll, the page body never does." },
+
+  "muiMapping": {
+    "_note": "NEUTRAL-FORWARD: palette.primary = INK (neutral near-black) so incidental MUI usage (controls, selected) reads premium/quiet. palette.secondary = MY HOME RED, reserved for the primary CTA + brand. info = steel (links). Semantics = success/warning/error, STATUS only.",
+    "palette.primary.main": "color.*.ink.default",
+    "palette.secondary.main": "color.*.brand.default",
+    "palette.info.main": "color.*.info.default",
+    "palette.success.main": "color.*.success.default",
+    "palette.warning.main": "color.*.warning.default",
+    "palette.error.main": "color.*.danger.default",
+    "palette.background.default": "color.*.surface.app",
+    "palette.background.paper": "color.*.surface.default",
+    "palette.text.primary": "color.*.text.primary",
+    "palette.text.secondary": "color.*.text.secondary",
+    "palette.divider": "color.*.border.hairline",
+    "shape.borderRadius": "radius.md (8)",
+    "typography.fontFamily": "typography.fontFamily",
+    "spacing": "4  // theme.spacing(1)=4px",
+    "components": "Button: disableElevation + disableRipple + textTransform none; the ONE hero CTA per view = color='secondary' variant='contained' (red); other actions = ink outlined/text. Paper flat + soft card shadow. DataGrid rowHeight=36, header=40, tabular-nums, stripe/hover/selected from color.*.dataRow; selected row uses red-50 tint. Focus ring = brand red."
+  },
+
+  "domain": {
+    "diaColumns": [8, 10, 12, 16, 20, 25, 32],
+    "abstractSections": ["A","B","C","D","E","F","G","H","I","J","K","L","M","N"],
+    "computedSections": ["C","G","H","K","L","M"],
+    "wastageCapPct": 3.0,
+    "wastageWarnBandPct": 0.5,
+    "cutPieceClassifications": ["reusable", "used_as_safety_steel", "scrap"],
+    "statusColorMap": { "ok":"success","nearThreshold":"warning","overCap":"danger","advisory":"warning","blocking":"danger","finalized":"brand" }
+  },
+
+  "_meta": {
+    "colorEngine": "Material-3 HCT tonal palettes (@material/material-color-utilities v0.4.0); ramps reproducible from seeds in `ramp._note`.",
+    "brand": "My Home Group — red #E4002B (accent), black/ink + white. Red used sparingly for premium restraint; danger = distinct maroon-red + icon.",
+    "contrastAA_light": {
+      "text.primary on surface.default": "15.55:1",
+      "text.primary on surface.app": "14.45:1",
+      "text.secondary on surface.default": "6.48:1",
+      "text.tertiary on surface.default": "5.2:1",
+      "onBrand(#FFF) on brand.default(red-600)": "5.36:1",
+      "onInk(#FFF) on ink.default": "13.18:1",
+      "brand.text(red-700) on surface.default": "7.21:1",
+      "info(steel-700) link on surface.default": "7.24:1",
+      "onWhite danger.default(maroon-700)": "7.22:1",
+      "danger.default on danger.subtle": "6.52:1",
+      "onWhite warning.default": "7.22:1",
+      "onWhite success.default": "7.25:1"
+    },
+    "contrastAA_dark": {
+      "text.primary on surface.app": "14.20:1",
+      "brand.text(red-400) on surface.default": "5.54:1"
+    },
+    "rules": [
+      "Neutral-forward: ink + zinc-neutral carry ~85% of the UI. My Home red is the ONE accent — brand, primary CTA, active nav, focus, selection tint. Never >1 red CTA per view.",
+      "Brand CTA fill = red-600 (white text AA). red-500 fails white-text AA — never use it as a fill behind white.",
+      "Danger = maroon-red (ramp danger) + always an icon, so it never reads as the brand red.",
+      "Semantic colors (success/warning/danger) are STATUS ONLY. No gradients, glassmorphism, or decorative shadows.",
+      "All numeric/data cells use typography.numericVariant (tabular-nums)."
+    ]
+  }
+}

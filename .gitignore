@@ -1,0 +1,61 @@
+# ========================
+# Node / Frontend
+# ========================
+node_modules/
+dist/
+*.local
+.env
+.env.local
+.env.*.local
+
+# ========================
+# Python / Backend
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========================
+# AI / Tool configs
+# ========================
+.claude/
+.gemini/
+.mcp.json
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================
+# Data files (reference Excel — large, not code)
+# ========================
+Apas/
+
+# ========================
+# Secrets / Environment
+# ========================
+backend/.env
+backend/.env.local
+
+# ========================
+# Build / Logs
+# ========================
+*.log
+npm-debug.log*

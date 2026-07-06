@@ -1,0 +1,287 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Steel Reconciliation Platform — theme.
+ * Values are the brand-anchored systematic palette from design-tokens.json
+ * (My Home Group: ink + zinc neutral carry the UI; brand red is the ONE accent;
+ * danger is the distinct maroon so it never reads as brand red).
+ * Do not hard-code colors in components — use these variables via Tailwind tokens.
+ */
+:root {
+  --background: #f8f6f7;
+  --foreground: #232425;
+  --card: #ffffff;
+  --card-foreground: #232425;
+  --popover: #ffffff;
+  --popover-foreground: #232425;
+
+  /* primary = INK (neutral near-black): quiet, premium default for controls */
+  --primary: #303031;
+  --primary-foreground: #ffffff;
+
+  --secondary: #efedee;
+  --secondary-foreground: #232425;
+  --muted: #f1eff0;
+  --muted-foreground: #6b6a6b;
+  --accent: #f1eff0;
+  --accent-foreground: #232425;
+
+  /* destructive = maroon danger (NOT the brand red) */
+  --destructive: #a62522;
+  --destructive-foreground: #ffffff;
+
+  --border: #e7e5e6;
+  --input: #dedcdd;
+  --ring: #d70028;
+
+  /* Brand — My Home red. The ONE accent: primary CTA, active nav, focus. */
+  --brand: #d70028;
+  --brand-foreground: #ffffff;
+  --brand-hover: #b2001f;
+  --brand-subtle: #fff0ef;
+  --brand-border: #ffc7c4;
+  --brand-text: #b2001f;
+
+  /* Status (STATUS ONLY — never decoration) */
+  --info: #2a5a85;
+  --info-subtle: #eef4ff;
+  --info-border: #abd2ff;
+  --success: #00652c;
+  --success-subtle: #e7f4ec;
+  --success-border: #82e494;
+  --warning: #7f4b00;
+  --warning-subtle: #fff1e7;
+  --warning-border: #ffc385;
+  --danger: #a62522;
+  --danger-subtle: #fff0ef;
+  --danger-border: #ffc7c2;
+
+  /* Data rows */
+  --row-stripe: #faf9fa;
+  --row-hover: #f1eff0;
+  --row-selected: #fff0ef;
+  --row-pinned: #f8f6f7;
+
+  --radius: 0.625rem;
+
+  --shadow-card: 0 1px 2px rgb(20 20 22 / 0.04), 0 8px 20px rgb(20 20 22 / 0.05);
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #232425;
+  --sidebar-primary: #303031;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1eff0;
+  --sidebar-accent-foreground: #232425;
+  --sidebar-border: #e7e5e6;
+  --sidebar-ring: #d70028;
+
+  --chart-1: #a62522;
+  --chart-2: #2a5a85;
+  --chart-3: #00652c;
+  --chart-4: #7f4b00;
+  --chart-5: #6b6a6b;
+}
+
+.dark {
+  --background: #161718;
+  --foreground: #eae7e9;
+  --card: #1d1e1f;
+  --card-foreground: #eae7e9;
+  --popover: #1d1e1f;
+  --popover-foreground: #eae7e9;
+
+  --primary: #e7e5e6;
+  --primary-foreground: #191a1b;
+
+  --secondary: #242526;
+  --secondary-foreground: #eae7e9;
+  --muted: #242526;
+  --muted-foreground: #9c9a9c;
+  --accent: #2a2a2c;
+  --accent-foreground: #eae7e9;
+
+  --destructive: #ff9b91;
+  --destructive-foreground: #2e1613;
+
+  --border: #2c2c2e;
+  --input: #3a393b;
+  --ring: #ff6564;
+
+  --brand: #d70028;
+  --brand-foreground: #ffffff;
+  --brand-hover: #f41934;
+  --brand-subtle: #2e0f12;
+  --brand-border: #5a2426;
+  --brand-text: #ff6564;
+
+  --info: #8dbaea;
+  --info-subtle: #17293b;
+  --info-border: #2f4a63;
+  --success: #69ca7e;
+  --success-subtle: #16271b;
+  --success-border: #2c4a34;
+  --warning: #f2a64d;
+  --warning-subtle: #2a2010;
+  --warning-border: #4c3a18;
+  --danger: #ff9b91;
+  --danger-subtle: #2e1613;
+  --danger-border: #5a2a26;
+
+  --row-stripe: #1e1f20;
+  --row-hover: #2a2a2c;
+  --row-selected: #2e0f12;
+  --row-pinned: #1c1d1e;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 24px rgb(0 0 0 / 0.4);
+
+  --sidebar: #1d1e1f;
+  --sidebar-foreground: #eae7e9;
+  --sidebar-primary: #e7e5e6;
+  --sidebar-primary-foreground: #191a1b;
+  --sidebar-accent: #2a2a2c;
+  --sidebar-accent-foreground: #eae7e9;
+  --sidebar-border: #2c2c2e;
+  --sidebar-ring: #ff6564;
+
+  --chart-1: #ff9b91;
+  --chart-2: #8dbaea;
+  --chart-3: #69ca7e;
+  --chart-4: #f2a64d;
+  --chart-5: #9c9a9c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-border: var(--brand-border);
+  --color-brand-text: var(--brand-text);
+
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-border: var(--info-border);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-border: var(--danger-border);
+
+  --color-row-stripe: var(--row-stripe);
+  --color-row-hover: var(--row-hover);
+  --color-row-selected: var(--row-selected);
+  --color-row-pinned: var(--row-pinned);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-card: var(--shadow-card);
+
+  --font-sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Landing display face — Fraunces (variable serif). Marketing surface only;
+     the in-app tool stays on Inter. */
+  --font-display: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-optical-sizing: auto;
+    font-feature-settings: "cv11" 1, "ss01" 1;
+  }
+  /* Every figure aligns in columns and never jitters on update. */
+  .tnum {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  /* Anchor jumps land below the 64px fixed nav (Lenis handles wheel smoothness). */
+  html {
+    scroll-padding-top: 80px;
+  }
+}
+
+/* ---- Landing-page ambient animation (aurora). Reduced-motion safe below. ---- */
+@keyframes aurora-drift-a {
+  0%, 100% { transform: translate3d(-8%, -4%, 0) scale(1); }
+  50% { transform: translate3d(6%, 6%, 0) scale(1.15); }
+}
+@keyframes aurora-drift-b {
+  0%, 100% { transform: translate3d(6%, 2%, 0) scale(1.1); }
+  50% { transform: translate3d(-6%, -6%, 0) scale(0.95); }
+}
+@keyframes aurora-drift-c {
+  0%, 100% { transform: translate3d(0, 4%, 0) scale(1); }
+  50% { transform: translate3d(-4%, -2%, 0) scale(1.2); }
+}
+.aurora-a { animation: aurora-drift-a 18s ease-in-out infinite; }
+.aurora-b { animation: aurora-drift-b 22s ease-in-out infinite; }
+.aurora-c { animation: aurora-drift-c 26s ease-in-out infinite; }
+
+/* ---- Hero scan-beams: a highlight that falls down each vertical rebar track,
+   like the tool scanning a column row by row. Staggered per beam in JS. ---- */
+@keyframes beam-fall {
+  0%   { transform: translateY(-140%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(1000%); opacity: 0; }
+}
+.beam-fall { animation: beam-fall var(--beam-dur, 7s) cubic-bezier(0.4, 0, 0.2, 1) infinite; animation-delay: var(--beam-delay, 0s); }
+
+/* Slow breathing of the ambient glow behind the title. */
+@keyframes glow-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
+.glow-breathe { animation: glow-breathe 9s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-a, .aurora-b, .aurora-c,
+  .beam-fall, .glow-breathe { animation: none; }
+  html { scroll-behavior: auto; }
+}

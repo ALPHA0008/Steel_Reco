@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Steel Reconciliation — Design Preview (systematic)</title>
+<style>
+  :root{
+    --surface-app:#FEF5EF;--surface-default:#FFFFFF;--surface-sunken:#F5ECE6;
+    --border-hairline:#E6DED8;--border-strong:#CDC5BF;--focus:#406E99;
+    --text-primary:#2B2724;--text-secondary:#635D59;--text-tertiary:#77716C;--text-disabled:#A69F9A;
+    --primary:#2A5A85;--primary-hover:#114771;--primary-subtle:#EEF4FF;--primary-border:#AAD3FF;
+    --accent:#BF3F09;--accent-hover:#9F3000;--accent-subtle:#FFF1ED;
+    --success:#00652C;--success-subtle:#E7F4EC;--success-border:#82E494;
+    --warning:#7F4B00;--warning-subtle:#FFF1E7;--warning-border:#FFC385;
+    --danger:#AE1216;--danger-subtle:#FFF0EE;--danger-border:#FFBFB8;
+    --row-stripe:#FBF6F2;--row-hover:#F5ECE6;--row-selected:#EEF4FF;--row-pinned:#FEF5EF;--on-accent:#FFF;
+  }
+  :root[data-theme="dark"]{
+    --surface-app:#1E1B18;--surface-default:#27231F;--surface-sunken:#181512;
+    --border-hairline:#3D3834;--border-strong:#544F4B;--focus:#8DBAEA;
+    --text-primary:#E9E1DB;--text-secondary:#ACA59F;--text-tertiary:#918A85;--text-disabled:#635D59;
+    --primary:#8DBAEA;--primary-hover:#AAD3FF;--primary-subtle:#17293B;--primary-border:#2F4A63;
+    --accent:#FF9D7C;--accent-hover:#FFC0AD;--accent-subtle:#2C1A10;
+    --success:#69CA7E;--success-subtle:#16271B;--success-border:#2C4A34;
+    --warning:#F2A64D;--warning-subtle:#2A2010;--warning-border:#4C3A18;
+    --danger:#FF9B90;--danger-subtle:#2E1613;--danger-border:#5A2A26;
+    --row-stripe:#221F1B;--row-hover:#2D2925;--row-selected:#17293B;--row-pinned:#201D19;--on-accent:#1E1B18;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface-app);color:var(--text-primary);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums lining-nums}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px}
+  h1{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px}
+  h2{font-size:16px;font-weight:600;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border-hairline)}
+  .sub{color:var(--text-secondary);font-size:13px;margin:0 0 8px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .mark{display:inline-flex;align-items:center;gap:8px;font-weight:600}
+  .mark::before{content:"";width:12px;height:12px;background:var(--accent);border-radius:2px}
+  .toggle{cursor:pointer;border:1px solid var(--border-strong);background:var(--surface-default);color:var(--text-primary);height:36px;padding:0 14px;border-radius:6px;font:inherit}
+  .toggle:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  /* ramps */
+  .ramps{display:flex;flex-direction:column;gap:6px}
+  .rampline{display:flex;align-items:center;gap:10px}
+  .rampname{width:74px;font-size:12px;color:var(--text-secondary);font-weight:600;text-transform:capitalize}
+  .rampstops{display:flex;flex:1;border-radius:6px;overflow:hidden;border:1px solid var(--border-hairline)}
+  .stop{flex:1;height:36px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px}
+  .stop span{font-size:9px;color:#fff;mix-blend-mode:difference;font-variant-numeric:tabular-nums}
+
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:var(--surface-default);border:1px solid var(--border-hairline);border-radius:8px;padding:16px}
+  .kpi-label{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);font-weight:600}
+  .kpi-value{font-size:24px;font-weight:600;margin-top:6px}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:9999px;border:1px solid transparent}
+  .chip.ok{color:var(--success);background:var(--success-subtle);border-color:var(--success-border)}
+  .chip.warn{color:var(--warning);background:var(--warning-subtle);border-color:var(--warning-border)}
+  .chip.bad{color:var(--danger);background:var(--danger-subtle);border-color:var(--danger-border)}
+  .chip.info{color:var(--primary);background:var(--primary-subtle);border-color:var(--primary-border)}
+
+  .gridwrap{overflow-x:auto;border:1px solid var(--border-hairline);border-radius:8px;background:var(--surface-default)}
+  table.abstract{border-collapse:collapse;width:100%;font-size:13px}
+  table.abstract th,table.abstract td{padding:0 12px;height:36px;white-space:nowrap;border-bottom:1px solid var(--border-hairline)}
+  table.abstract thead th{position:sticky;top:0;background:var(--surface-sunken);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600;color:var(--text-secondary);text-align:right}
+  table.abstract thead th:first-child{text-align:left}
+  table.abstract td.label,table.abstract th.label{position:sticky;left:0;background:var(--row-pinned);text-align:left;font-weight:500;min-width:210px;z-index:1}
+  table.abstract td.total,table.abstract th.total{position:sticky;right:0;background:var(--row-pinned);font-weight:600}
+  table.abstract td{text-align:right}
+  table.abstract tbody tr:nth-child(even) td:not(.label):not(.total){background:var(--row-stripe)}
+  table.abstract tbody tr:hover td{background:var(--row-hover)}
+  tr.overcap td{background:var(--danger-subtle)!important;color:var(--danger);font-weight:600}
+  tr.computed td.label{color:var(--primary)}
+
+  .form{max-width:640px}
+  .banner{display:flex;gap:10px;padding:10px 12px;border-radius:6px;font-size:13px;margin-bottom:16px;border:1px solid transparent}
+  .banner.warn{background:var(--warning-subtle);border-color:var(--warning-border);color:var(--warning)}
+  .field{margin-bottom:24px}
+  .field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+  .field input,.field select{width:100%;height:36px;padding:0 10px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface-default);color:var(--text-primary);font:inherit}
+  .field input:focus,.field select:focus{outline:2px solid var(--focus);outline-offset:2px;border-color:var(--primary)}
+  .field input[readonly]{background:var(--surface-sunken);color:var(--text-secondary)}
+  .field .err{color:var(--danger);font-size:12px;margin-top:6px}
+  .field.has-error input{border-color:var(--danger)}
+
+  .btns{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn{height:36px;padding:0 16px;border-radius:6px;font:inherit;font-weight:500;cursor:pointer;border:1px solid transparent}
+  .btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .btn-cta{background:var(--accent);color:var(--on-accent)}
+  .btn-cta:hover{background:var(--accent-hover)}
+  .btn-secondary{background:transparent;color:var(--primary);border-color:var(--primary-border)}
+  .btn-ghost{background:transparent;color:var(--primary)}
+  .btn-danger{background:transparent;color:var(--danger);border-color:var(--danger-border)}
+  .note{color:var(--text-tertiary);font-size:12px}
+  .type-row{display:flex;align-items:baseline;gap:16px;padding:6px 0;border-bottom:1px dashed var(--border-hairline)}
+  .type-row .tag{width:120px;color:var(--text-tertiary);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <span class="mark">Steel Reconciliation</span>
+      <h1 style="margin-top:6px;">Design Preview <span style="font-size:13px;color:var(--text-tertiary);font-weight:400">· systematic (HCT)</span></h1>
+      <p class="sub">Color derived from Material-3 tonal ramps · one copper accent · WCAG 2.2 AA · mirrors design-tokens.json</p>
+    </div>
+    <button class="toggle" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';this.textContent=r.dataset.theme==='dark'?'☀ Light':'☾ Dark';">☾ Dark</button>
+  </div>
+
+  <h2>Tonal ramps — the systematic foundation</h2>
+  <p class="sub">Every role in the UI is a stop on one of these (e.g. primary = steel-700, its hover = steel-800, its subtle bg = steel-50). Generated by Google's HCT engine, so states are mathematically consistent — not hand-picked.</p>
+  <div class="ramps">
+    <div class="rampline"><span class="rampname">steel</span><div class="rampstops"><div class="stop" style="background:#eef4ff"><span>50</span></div><div class="stop" style="background:#d4e7ff"><span>100</span></div><div class="stop" style="background:#aad3ff"><span>200</span></div><div class="stop" style="background:#8dbaea"><span>300</span></div><div class="stop" style="background:#709cca"><span>400</span></div><div class="stop" style="background:#5380ac"><span>500</span></div><div class="stop" style="background:#406e99"><span>600</span></div><div class="stop" style="background:#2a5a85"><span>700</span></div><div class="stop" style="background:#114771"><span>800</span></div><div class="stop" style="background:#003558"><span>900</span></div><div class="stop" style="background:#00233e"><span>950</span></div></div></div>
+    <div class="rampline"><span class="rampname">copper</span><div class="rampstops"><div class="stop" style="background:#fff1ed"><span>50</span></div><div class="stop" style="background:#ffded5"><span>100</span></div><div class="stop" style="background:#ffc0ad"><span>200</span></div><div class="stop" style="background:#ff9d7c"><span>300</span></div><div class="stop" style="background:#fd6b36"><span>400</span></div><div class="stop" style="background:#d74f1c"><span>500</span></div><div class="stop" style="background:#bf3f09"><span>600</span></div><div class="stop" style="background:#9f3000"><span>700</span></div><div class="stop" style="background:#7f2500"><span>800</span></div><div class="stop" style="background:#611a00"><span>900</span></div><div class="stop" style="background:#440f00"><span>950</span></div></div></div>
+    <div class="rampline"><span class="rampname">neutral</span><div class="rampstops"><div class="stop" style="background:#fbf2ec"><span>50</span></div><div class="stop" style="background:#ece4de"><span>100</span></div><div class="stop" style="background:#d5cdc8"><span>200</span></div><div class="stop" style="background:#bcb5af"><span>300</span></div><div class="stop" style="background:#9e9792"><span>400</span></div><div class="stop" style="background:#817b76"><span>500</span></div><div class="stop" style="background:#6f6a65"><span>600</span></div><div class="stop" style="background:#5b5652"><span>700</span></div><div class="stop" style="background:#484440"><span>800</span></div><div class="stop" style="background:#36322e"><span>900</span></div><div class="stop" style="background:#25211d"><span>950</span></div></div></div>
+    <div class="rampline"><span class="rampname">success</span><div class="rampstops"><div class="stop" style="background:#d2ffd4"><span>50</span></div><div class="stop" style="background:#98fba9"><span>100</span></div><div class="stop" style="background:#82e494"><span>200</span></div><div class="stop" style="background:#69ca7e"><span>300</span></div><div class="stop" style="background:#4aab63"><span>400</span></div><div class="stop" style="background:#298e49"><span>500</span></div><div class="stop" style="background:#0a7b39"><span>600</span></div><div class="stop" style="background:#00652c"><span>700</span></div><div class="stop" style="background:#005021"><span>800</span></div><div class="stop" style="background:#003c17"><span>900</span></div><div class="stop" style="background:#00280d"><span>950</span></div></div></div>
+    <div class="rampline"><span class="rampname">warning</span><div class="rampstops"><div class="stop" style="background:#fff1e7"><span>50</span></div><div class="stop" style="background:#ffe0c3"><span>100</span></div><div class="stop" style="background:#ffc385"><span>200</span></div><div class="stop" style="background:#f2a64d"><span>300</span></div><div class="stop" style="background:#d08933"><span>400</span></div><div class="stop" style="background:#af6d16"><span>500</span></div><div class="stop" style="background:#9a5c00"><span>600</span></div><div class="stop" style="background:#7f4b00"><span>700</span></div><div class="stop" style="background:#653b00"><span>800</span></div><div class="stop" style="background:#4c2b00"><span>900</span></div><div class="stop" style="background:#341c00"><span>950</span></div></div></div>
+    <div class="rampline"><span class="rampname">danger</span><div class="rampstops"><div class="stop" style="background:#fff0ee"><span>50</span></div><div class="stop" style="background:#ffdeda"><span>100</span></div><div class="stop" style="background:#ffbfb8"><span>200</span></div><div class="stop" style="background:#ff9b90"><span>300</span></div><div class="stop" style="background:#ff665a"><span>400</span></div><div class="stop" style="background:#e43d36"><span>500</span></div><div class="stop" style="background:#cb2b27"><span>600</span></div><div class="stop" style="background:#ae1216"><span>700</span></div><div class="stop" style="background:#8f000a"><span>800</span></div><div class="stop" style="background:#6d0005"><span>900</span></div><div class="stop" style="background:#4c0003"><span>950</span></div></div></div>
+  </div>
+
+  <h2>KPI tiles</h2>
+  <div class="grid4">
+    <div class="card"><div class="kpi-label">Net Received</div><div class="kpi-value num">312.48 <span style="font-size:13px;color:var(--text-tertiary)">MT</span></div><span class="chip info">Cumulative</span></div>
+    <div class="card"><div class="kpi-label">Consumption + WIP</div><div class="kpi-value num">286.10 <span style="font-size:13px;color:var(--text-tertiary)">MT</span></div><span class="chip ok">On plan</span></div>
+    <div class="card"><div class="kpi-label">Physical Stock</div><div class="kpi-value num">12.24 <span style="font-size:13px;color:var(--text-tertiary)">MT</span></div><span class="chip ok">Reconciled</span></div>
+    <div class="card"><div class="kpi-label">Wastage</div><div class="kpi-value num" style="color:var(--danger)">4.97%</div><span class="chip bad">▲ over 3% cap</span></div>
+  </div>
+
+  <h2>Monthly Steel Abstract</h2>
+  <div class="gridwrap">
+    <table class="abstract">
+      <thead><tr><th class="label">Section</th><th>8</th><th>10</th><th>12</th><th>16</th><th>20</th><th>25</th><th>32</th><th class="total">Total</th></tr></thead>
+      <tbody>
+        <tr><td class="label">A · Received</td><td class="num">4.20</td><td class="num">18.60</td><td class="num">42.10</td><td class="num">88.40</td><td class="num">61.20</td><td class="num">54.90</td><td class="num">43.08</td><td class="total num">312.48</td></tr>
+        <tr class="computed"><td class="label">C · Net Received</td><td class="num">4.20</td><td class="num">18.60</td><td class="num">40.00</td><td class="num">88.40</td><td class="num">59.80</td><td class="num">54.90</td><td class="num">43.08</td><td class="total num">308.98</td></tr>
+        <tr><td class="label">D · Issued to Contractor</td><td class="num">4.10</td><td class="num">18.10</td><td class="num">39.20</td><td class="num">86.90</td><td class="num">58.40</td><td class="num">53.70</td><td class="num">42.30</td><td class="total num">302.70</td></tr>
+        <tr class="computed"><td class="label">G · Consumption + WIP</td><td class="num">4.00</td><td class="num">17.70</td><td class="num">38.40</td><td class="num">84.20</td><td class="num">56.70</td><td class="num">51.90</td><td class="num">40.60</td><td class="total num">293.50</td></tr>
+        <tr class="computed"><td class="label">K · Total Physical</td><td class="num">0.16</td><td class="num">0.74</td><td class="num">1.28</td><td class="num">3.40</td><td class="num">2.55</td><td class="num">2.42</td><td class="num">1.94</td><td class="total num">12.49</td></tr>
+        <tr class="overcap"><td class="label">M · Wastage %</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="total num">4.97%</td></tr>
+        <tr><td class="label">N · Scrap Sold</td><td class="num">0.02</td><td class="num">0.08</td><td class="num">0.14</td><td class="num">0.30</td><td class="num">0.20</td><td class="num">0.18</td><td class="num">0.16</td><td class="total num">1.08</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Data entry — New GRN</h2>
+  <div class="card form">
+    <div class="banner warn">⚠ This GRN has no linked Purchase Order — it will be saved but flagged for reconciliation.</div>
+    <div class="field"><label>Receipt Type</label><select><option>Against PO</option><option>Other-site (SAP)</option><option>Other-site (Excel)</option></select></div>
+    <div class="field has-error"><label>Supplier Invoice No.</label><input value="" placeholder="e.g. INV-2026-0412" /><div class="err" role="alert">Enter the supplier invoice number.</div></div>
+    <div class="field"><label>Net weight (kg) · auto</label><input class="num" value="16,440" readonly /></div>
+    <div class="btns"><button class="btn btn-cta">Save GRN</button><button class="btn btn-ghost">Cancel</button></div>
+  </div>
+
+  <h2>Buttons &amp; status</h2>
+  <div class="btns" style="margin-bottom:16px;">
+    <button class="btn btn-cta">Finalize Month</button>
+    <button class="btn btn-secondary">Export CSV</button>
+    <button class="btn btn-ghost">Filter</button>
+    <button class="btn btn-danger">Reopen</button>
+  </div>
+  <div class="btns">
+    <span class="chip ok">✓ Within cap</span>
+    <span class="chip warn">⚠ Near threshold</span>
+    <span class="chip bad">⛔ Blocking violation</span>
+    <span class="chip info">🔒 Finalized</span>
+  </div>
+
+  <h2>Type scale (Inter)</h2>
+  <div>
+    <div class="type-row"><span class="tag">display 24/600</span><span style="font-size:24px;font-weight:600;letter-spacing:-.01em">Monthly Steel Abstract</span></div>
+    <div class="type-row"><span class="tag">title 20/600</span><span style="font-size:20px;font-weight:600">APAS — Kokapet</span></div>
+    <div class="type-row"><span class="tag">body 14/400</span><span style="font-size:14px">Issued to contractor is a genuine sum of issue rows.</span></div>
+    <div class="type-row"><span class="tag">num 13 tabular</span><span class="num" style="font-size:13px">1,204,860.50</span></div>
+  </div>
+
+  <p class="note" style="margin-top:32px;">Systematic palette (Material-3 HCT). Toggle dark mode top-right. Specs in <code>design.md</code>; rationale in <code>brandguidelines.md</code>.</p>
+</div>
+</body>
+</html>

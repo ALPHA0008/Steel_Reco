@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: steel_recon_postgres
+    environment:
+      # NOTE: POSTGRES_USER is always created as a Postgres SUPERUSER, and
+      # superusers bypass Row-Level Security entirely (rolbypassrls). The app
+      # must NEVER connect as this role -- migration 0003 creates a separate,
+      # restricted steel_recon_app role for that. This role (steel_recon) is
+      # only for running Alembic migrations (DDL, CREATE ROLE, GRANT).
+      POSTGRES_DB: steel_recon
+      POSTGRES_USER: steel_recon
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U steel_recon -d steel_recon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
