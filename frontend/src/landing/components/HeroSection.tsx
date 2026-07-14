@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { HeroBackground } from "./HeroBackground"
 
-const TITLE = "Niṣṭhā"
+const TITLE = "Digi Reco"
 
 // Container staggers its children; each rises and un-blurs into place.
 const container: Variants = {
@@ -19,6 +19,10 @@ const letter: Variants = {
   hidden: { opacity: 0, y: 40, filter: "blur(12px)" },
   visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.2, 0, 0, 1] } },
 }
+
+// "Digi" stays ink; "Reco" carries the warm coral-red accent.
+const DIGI = "Digi"
+const RECO = "Reco"
 
 export function HeroSection() {
   const { user } = useAuth()
@@ -35,14 +39,27 @@ export function HeroSection() {
         animate="visible"
         className="relative mx-auto flex max-w-[1100px] flex-col items-center px-6 pt-16 pb-24 text-center"
       >
-        {/* Title — per-letter blur-rise reveal, precomposed glyphs in the display face. */}
+        {/* Title — per-letter blur-rise reveal. "Reco" carries the accent color. */}
         <h1
-          className="font-display font-semibold leading-[0.92] tracking-[-0.035em] text-foreground text-[76px] sm:text-[104px] md:text-[136px]"
+          className="font-display font-semibold leading-[0.92] tracking-[-0.03em] text-[46px] sm:text-[76px] md:text-[104px]"
+          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06), 0 12px 32px rgba(0,0,0,0.04)" }}
           aria-label={TITLE}
-          style={{ fontFeatureSettings: '"liga" 1, "calt" 1' }}
         >
-          {[...TITLE].map((ch, i) => (
-            <motion.span key={i} variants={letter} className="inline-block">
+          {[...DIGI].map((ch, i) => (
+            <motion.span key={`digi-${i}`} variants={letter} className="inline-block text-foreground">
+              {ch}
+            </motion.span>
+          ))}
+          <motion.span variants={letter} className="inline-block text-foreground">
+            &nbsp;
+          </motion.span>
+          {[...RECO].map((ch, i) => (
+            <motion.span
+              key={`reco-${i}`}
+              variants={letter}
+              className="inline-block"
+              style={{ color: "#ed1c24", textShadow: "0 1px 3px rgba(237,28,36,0.12), 0 4px 12px rgba(237,28,36,0.08), 0 12px 32px rgba(237,28,36,0.05)" }}
+            >
               {ch}
             </motion.span>
           ))}

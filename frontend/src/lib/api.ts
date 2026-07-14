@@ -97,3 +97,80 @@ export async function fetchMe(): Promise<CurrentUser> {
   const res = await api.get<CurrentUser>("/auth/me")
   return res.data
 }
+
+export interface ProjectPicker {
+  id: string
+  name: string
+}
+
+/** Public, unauthenticated -- feeds the signup page's project picker. */
+export async function fetchProjectsForSignup(): Promise<ProjectPicker[]> {
+  const res = await api.get<ProjectPicker[]>("/projects")
+  return res.data
+}
+
+export interface SignupPayload {
+  username: string
+  email: string
+  password: string
+  full_name: string
+  project_id: string
+  signup_code: string
+}
+
+export async function signup(payload: SignupPayload): Promise<string> {
+  const res = await api.post<{ access_token: string }>("/auth/signup", payload)
+  return res.data.access_token
+}
+
+// ---- Admin ----
+
+export interface AdminUser {
+  id: string
+  username: string
+  email: string
+  full_name: string
+  role: string
+  is_active: boolean
+  last_login_at: string | null
+  created_at: string
+  project_id: string | null
+  project_name: string | null
+}
+
+export interface AdminAuditEntry {
+  id: string
+  action: string
+  table_name: string
+  row_id: string | null
+  project_id: string | null
+  created_at: string
+}
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  const res = await api.get<AdminUser[]>("/admin/users")
+  return res.data
+}
+
+export async function fetchAdminUserActivity(userId: string): Promise<AdminAuditEntry[]> {
+  const res = await api.get<AdminAuditEntry[]>(`/admin/users/${userId}/activity`)
+  return res.data
+}
+
+export async function deactivateAdminUser(userId: string): Promise<AdminUser> {
+  const res = await api.post<AdminUser>(`/admin/users/${userId}/deactivate`)
+  return res.data
+}
+
+export async function reactivateAdminUser(userId: string): Promise<AdminUser> {
+  const res = await api.post<AdminUser>(`/admin/users/${userId}/reactivate`)
+  return res.data
+}
+
+export async function setProjectSignupCode(projectId: string, code?: string): Promise<{ signup_code: string }> {
+  const res = await api.post<{ project_id: string; signup_code: string }>(
+    `/admin/projects/${projectId}/signup-code`,
+    code ? { signup_code: code } : {},
+  )
+  return res.data
+}

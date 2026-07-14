@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.error_handlers import register_error_handlers
 from app.routers import (
     abstract,
+    admin,
     auth,
     bbs_plan,
     dashboard,
@@ -24,6 +25,7 @@ app = FastAPI(title="Steel Reconciliation Platform", version="0.1.0")
 register_error_handlers(app)
 
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(masters.router)
 app.include_router(projects.router)
 app.include_router(upstream.router)

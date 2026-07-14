@@ -92,3 +92,20 @@ async def get_current_user_row(current_user: CurrentUser, session: ScopedSession
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or inactive")
     return user
+
+
+async def require_admin(current_user: CurrentUser) -> uuid.UUID:
+    """Gate for admin-only routes (user management, monitoring). `users` and
+    `project_assignments` carry NO row-level security (plan §3.1/§3.3 — they
+    are identity tables, not tenant data), so unlike every other route in
+    this app, RLS does not stop a non-admin from reading every user's row
+    here; this explicit role check is the only guard, not defense-in-depth
+    on top of one.
+    """
+    user_id, role = current_user
+    if role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin access required")
+    return user_id
+
+
+RequireAdmin = Annotated[uuid.UUID, Depends(require_admin)]

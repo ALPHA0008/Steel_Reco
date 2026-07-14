@@ -1,7 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_session, set_rls_context
 from app.dependencies import ProjectScope, ScopedSession
 from app.models.structure import Element, Floor, Project, Tower
 from app.repositories.structure_repository import (
@@ -15,12 +18,28 @@ from app.schemas.structure import (
     ElementResponse,
     FloorCreate,
     FloorResponse,
+    ProjectPickerResponse,
     ProjectResponse,
     TowerCreate,
     TowerResponse,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["projects"])
+
+
+@router.get("/projects", response_model=list[ProjectPickerResponse])
+async def list_projects_for_signup(session: AsyncSession = Depends(get_session)) -> list[ProjectPickerResponse]:
+    """Public, unauthenticated -- feeds the signup page's project picker.
+    Deliberately minimal (id + name only, see ProjectPickerResponse) and
+    ordered by name, not by anything that would hint at size/activity.
+
+    `projects` carries RLS; this pre-auth read needs the same admin-context
+    grant used in auth_service.signup for the same reason -- there is no
+    caller identity yet to scope a normal session to.
+    """
+    await set_rls_context(session, user_id=None, user_role="admin")
+    result = await session.execute(select(Project).where(Project.status == "active").order_by(Project.name))
+    return [ProjectPickerResponse.model_validate(p) for p in result.scalars().all()]
 
 
 @router.get("/projects/me", response_model=ProjectResponse)

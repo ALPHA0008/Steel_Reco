@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Navigate, useLocation, useNavigate } from "react-router-dom"
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { TriangleAlert } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
@@ -43,7 +43,9 @@ export function LoginPage() {
     <div className="grid min-h-screen place-items-center bg-background p-6">
       <div className="w-full max-w-sm">
         <div className="mb-7 text-center">
-          <Wordmark className="text-[34px] text-foreground" />
+          <Link to="/" className="inline-block transition-opacity hover:opacity-75" aria-label="Back to the Digi Reco site">
+            <Wordmark className="text-[34px] text-foreground" />
+          </Link>
           <p className="mt-2 text-[11px] font-semibold tracking-[0.22em] text-muted-foreground uppercase">
             Steel Reconciliation Tool
           </p>
@@ -96,6 +98,12 @@ export function LoginPage() {
         </Card>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
+          New here?{" "}
+          <Link to="/signup" className="font-medium text-foreground underline underline-offset-2">
+            Create an account
+          </Link>
+        </p>
+        <p className="mt-1.5 text-center text-xs text-muted-foreground">
           Steel reconciliation for My Home Constructions projects.
         </p>
       </div>

@@ -8,6 +8,7 @@ import type {
   Contractor,
   DashboardSummary,
   DiaGrade,
+  Element,
   ExceptionLog,
   ExceptionResolutionType,
   Floor,
@@ -106,6 +107,15 @@ export function useFloors(towerId: string | undefined) {
     queryKey: ["floors", towerId],
     queryFn: async () => (await api.get<Floor[]>(`/towers/${towerId}/floors`)).data,
     enabled: Boolean(towerId),
+    staleTime: MASTERS_STALE,
+  })
+}
+
+export function useElements(floorId: string | undefined) {
+  return useQuery({
+    queryKey: ["elements", floorId],
+    queryFn: async () => (await api.get<Element[]>(`/floors/${floorId}/elements`)).data,
+    enabled: Boolean(floorId),
     staleTime: MASTERS_STALE,
   })
 }

@@ -44,3 +44,16 @@ class ProjectMismatch(DomainError):
 
 class NotFoundError(DomainError):
     """Requested row does not exist (or isn't visible under RLS). -> HTTP 404."""
+
+
+class AlreadyCorrected(DomainError):
+    """Attempted to correct a row that another row already supersedes -> HTTP 409.
+    Corrections must form a chain (A<-B<-C), never a fork (B and C both
+    correcting A) -- a fork would make both replacements count in the Abstract
+    at once, silently double-counting the re-stated quantity.
+    """
+
+    def __init__(self, row_id: str, superseded_by: str):
+        self.row_id = row_id
+        self.superseded_by = superseded_by
+        super().__init__(f"row {row_id} was already corrected by {superseded_by}; correct that row instead")

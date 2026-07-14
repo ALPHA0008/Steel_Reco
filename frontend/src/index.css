@@ -246,42 +246,40 @@
   }
 }
 
-/* ---- Landing-page ambient animation (aurora). Reduced-motion safe below. ---- */
-@keyframes aurora-drift-a {
-  0%, 100% { transform: translate3d(-8%, -4%, 0) scale(1); }
-  50% { transform: translate3d(6%, 6%, 0) scale(1.15); }
-}
-@keyframes aurora-drift-b {
-  0%, 100% { transform: translate3d(6%, 2%, 0) scale(1.1); }
-  50% { transform: translate3d(-6%, -6%, 0) scale(0.95); }
-}
-@keyframes aurora-drift-c {
-  0%, 100% { transform: translate3d(0, 4%, 0) scale(1); }
-  50% { transform: translate3d(-4%, -2%, 0) scale(1.2); }
-}
-.aurora-a { animation: aurora-drift-a 18s ease-in-out infinite; }
-.aurora-b { animation: aurora-drift-b 22s ease-in-out infinite; }
-.aurora-c { animation: aurora-drift-c 26s ease-in-out infinite; }
+/* ---- Hero background (reconciliation-network motif): source nodes converge
+   into an intelligence core, floating metrics, scattered construction metadata.
+   All rotation animates the standalone `rotate` property (not the `transform`
+   shorthand) so it composes with translate-based centering instead of
+   clobbering it. Reduced-motion safe below. ---- */
 
-/* ---- Hero scan-beams: a highlight that falls down each vertical rebar track,
-   like the tool scanning a column row by row. Staggered per beam in JS. ---- */
-@keyframes beam-fall {
-  0%   { transform: translateY(-140%); opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { transform: translateY(1000%); opacity: 0; }
-}
-.beam-fall { animation: beam-fall var(--beam-dur, 7s) cubic-bezier(0.4, 0, 0.2, 1) infinite; animation-delay: var(--beam-delay, 0s); }
+/* Concentric rings around the core spin slowly, counter to each other. */
+@keyframes ring-spin { to { rotate: 360deg; } }
+@keyframes ring-spin-reverse { to { rotate: -360deg; } }
+.ring-spin { animation: ring-spin 60s linear infinite; }
+.ring-spin-reverse { animation: ring-spin-reverse 45s linear infinite; }
 
-/* Slow breathing of the ambient glow behind the title. */
-@keyframes glow-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50%      { transform: scale(1.12); opacity: 1; }
+/* Orbit rig: a full-bleed layer centered on the core rotates; the node rides
+   its edge. The node's inner content counter-rotates to stay upright. */
+@keyframes orbit { to { rotate: 360deg; } }
+@keyframes orbit-counter { to { rotate: -360deg; } }
+.orbit { animation: orbit var(--orbit-dur, 44s) linear infinite; animation-delay: var(--orbit-delay, 0s); }
+.orbit-node { animation: orbit-counter var(--orbit-dur, 44s) linear infinite; animation-delay: var(--orbit-delay, 0s); }
+
+/* Core pulse — a soft breathing on the standalone scale + opacity. */
+@keyframes core-pulse {
+  0%, 100% { scale: 0.92; opacity: 0.55; }
+  50%      { scale: 1.08; opacity: 0.9; }
 }
-.glow-breathe { animation: glow-breathe 9s ease-in-out infinite; }
+.core-pulse { animation: core-pulse 5s ease-in-out infinite; }
+
+/* Floating metric cards drift gently on their own cadence. */
+@keyframes metric-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+.metric-float { animation: metric-float var(--float-dur, 9s) ease-in-out infinite; animation-delay: var(--float-delay, 0s); }
 
 @media (prefers-reduced-motion: reduce) {
-  .aurora-a, .aurora-b, .aurora-c,
-  .beam-fall, .glow-breathe { animation: none; }
+  .ring-spin, .ring-spin-reverse, .orbit, .orbit-node, .core-pulse, .metric-float { animation: none; }
   html { scroll-behavior: auto; }
 }

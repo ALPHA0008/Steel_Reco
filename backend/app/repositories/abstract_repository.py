@@ -20,10 +20,15 @@ class AbstractRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def section_a_received(
-        self, project_id: uuid.UUID, month_start: date, month_end: date
-    ) -> list[dict]:
-        """Section A: grn grouped by dia x receipt_type."""
+    async def section_a_received(self, project_id: uuid.UUID, month_end: date) -> list[dict]:
+        """Section A: grn grouped by dia x receipt_type. Cumulative from
+        project start through month_end (no month_start bound) -- the
+        Abstract has no opening-balance concept (plan's cumulative-ledger
+        decision; the real Excel's own A totals the full history, not one
+        month). Fixed 2026-07-14: this and B/D/E/N previously bucketed to a
+        single month, contradicting that decision and making the live
+        Abstract structurally incomparable to the Excel.
+        """
         result = await self.session.execute(
             text(
                 """
@@ -33,20 +38,18 @@ class AbstractRepository:
                        SUM(g.weighbridge_weight_kg) FILTER (WHERE g.receipt_type = 'other_site_excel') AS other_site_excel_kg,
                        SUM(g.weighbridge_weight_kg) AS total_received_kg
                 FROM grn g JOIN dia_grades dg ON dg.id = g.dia_grade_id
-                WHERE g.project_id = :pid
-                  AND g.effective_date >= :month_start AND g.effective_date < :month_end
+                WHERE g.project_id = :pid AND g.effective_date < :month_end
                 GROUP BY dg.diameter_mm
                 ORDER BY dg.diameter_mm
                 """
             ),
-            {"pid": project_id, "month_start": month_start, "month_end": month_end},
+            {"pid": project_id, "month_end": month_end},
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
-    async def section_b_transferred(
-        self, project_id: uuid.UUID, month_start: date, month_end: date
-    ) -> list[dict]:
-        """Section B: inter_site_transfer (flag=loan, outbound) by dia x record_source."""
+    async def section_b_transferred(self, project_id: uuid.UUID, month_end: date) -> list[dict]:
+        """Section B: inter_site_transfer (flag=loan, outbound) by dia x record_source.
+        Cumulative through month_end -- see section_a_received's note."""
         result = await self.session.execute(
             text(
                 """
@@ -55,22 +58,20 @@ class AbstractRepository:
                        SUM(t.quantity_kg) FILTER (WHERE t.record_source = 'excel') AS transfer_excel_kg,
                        SUM(t.quantity_kg) AS total_transferred_kg
                 FROM inter_site_transfer t JOIN dia_grades dg ON dg.id = t.dia_grade_id
-                WHERE t.from_project_id = :pid AND t.flag = 'loan'
-                  AND t.effective_date >= :month_start AND t.effective_date < :month_end
+                WHERE t.from_project_id = :pid AND t.flag = 'loan' AND t.effective_date < :month_end
                 GROUP BY dg.diameter_mm
                 ORDER BY dg.diameter_mm
                 """
             ),
-            {"pid": project_id, "month_start": month_start, "month_end": month_end},
+            {"pid": project_id, "month_end": month_end},
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
-    async def section_d_issued(
-        self, project_id: uuid.UUID, month_start: date, month_end: date
-    ) -> list[dict]:
+    async def section_d_issued(self, project_id: uuid.UUID, month_end: date) -> list[dict]:
         """Section D: store_issue SUM(out) - SUM(in) per dia x contractor --
         the core bug fix (plan §3.2). Genuinely summed from issue rows, never
-        derived from section C.
+        derived from section C. Cumulative through month_end -- see
+        section_a_received's note.
         """
         result = await self.session.execute(
             text(
@@ -83,23 +84,25 @@ class AbstractRepository:
                 FROM store_issue si
                   JOIN dia_grades dg ON dg.id = si.dia_grade_id
                   JOIN contractors c ON c.id = si.contractor_id
-                WHERE si.project_id = :pid
-                  AND si.effective_date >= :month_start AND si.effective_date < :month_end
+                WHERE si.project_id = :pid AND si.effective_date < :month_end
                 GROUP BY dg.diameter_mm, si.contractor_id, c.name
                 ORDER BY dg.diameter_mm, c.name
                 """
             ),
-            {"pid": project_id, "month_start": month_start, "month_end": month_end},
+            {"pid": project_id, "month_end": month_end},
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
-    async def section_e_consumption(
-        self, project_id: uuid.UUID, month_start: date, month_end: date
-    ) -> list[dict]:
+    async def section_e_consumption(self, project_id: uuid.UUID, month_end: date) -> list[dict]:
         """Section E: Sigma jmr_actual.measured_weight_kg by dia x contractor
         (plan §4 -- traced to the real per-tower pour-row formulas; jmr_actual
         is the schema's landing spot for that per-tower detail once the
         external STEEL ABSTRACT workbooks are parsed, per §11 item 1).
+        Cumulative through month_end -- see section_a_received's note.
+
+        Superseded rows (those another row corrects via corrected_from_id) are
+        excluded -- a corrected measurement is replaced, not added to. Same
+        predicate as JmrActualRepository._NOT_SUPERSEDED; keep them in sync.
         """
         result = await self.session.execute(
             text(
@@ -109,13 +112,13 @@ class AbstractRepository:
                 FROM jmr_actual j
                   JOIN dia_grades dg ON dg.id = j.dia_grade_id
                   LEFT JOIN contractors c ON c.id = j.contractor_id
-                WHERE j.project_id = :pid
-                  AND j.effective_date >= :month_start AND j.effective_date < :month_end
+                WHERE j.project_id = :pid AND j.effective_date < :month_end
+                  AND NOT EXISTS (SELECT 1 FROM jmr_actual j2 WHERE j2.corrected_from_id = j.id)
                 GROUP BY dg.diameter_mm, j.contractor_id, c.name
                 ORDER BY dg.diameter_mm
                 """
             ),
-            {"pid": project_id, "month_start": month_start, "month_end": month_end},
+            {"pid": project_id, "month_end": month_end},
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
@@ -125,6 +128,12 @@ class AbstractRepository:
         x50% literal, now real captured data). Uses the LATEST completion_pct
         per element as of month_end, same 'latest, not summed' pattern as
         physical_count (section I/J).
+
+        An element with an ACTIVE JMR row is excluded entirely: WIP means
+        'cast but not yet jointly measured' (the legacy sheet's semantics --
+        pours move from WIP to Consumption once measured). Without this, the
+        same element's steel counts in E via its JMR AND in F via its
+        completion %, double-counting it in G (fixed 2026-07-14).
         """
         result = await self.session.execute(
             text(
@@ -141,6 +150,14 @@ class AbstractRepository:
                   JOIN dia_grades dg ON dg.id = bp.dia_grade_id
                   JOIN latest_progress lp ON lp.element_id = bp.element_id
                 WHERE bp.project_id = :pid AND bp.element_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM jmr_actual ja
+                      WHERE ja.element_id = bp.element_id
+                        AND ja.effective_date < :month_end
+                        AND NOT EXISTS (
+                            SELECT 1 FROM jmr_actual ja2 WHERE ja2.corrected_from_id = ja.id
+                        )
+                  )
                 GROUP BY dg.diameter_mm, bp.contractor_id
                 ORDER BY dg.diameter_mm
                 """
@@ -198,23 +215,81 @@ class AbstractRepository:
         )
         return [dict(r._mapping) for r in result.fetchall()]
 
-    async def section_n_scrap_sold(
-        self, project_id: uuid.UUID, month_start: date, month_end: date
-    ) -> Decimal:
+    async def section_n_scrap_sold(self, project_id: uuid.UUID, month_end: date) -> Decimal:
         """Section N: scrap_sale totals (project-wide, not per-dia -- the
-        real scrap register is mixed-dia per sale, plan's data-model notes)."""
+        real scrap register is mixed-dia per sale, plan's data-model notes).
+        Cumulative through month_end -- see section_a_received's note."""
+        result = await self.session.execute(
+            text(
+                "SELECT COALESCE(SUM(weight_kg), 0) AS total_scrap_kg "
+                "FROM scrap_sale WHERE project_id = :pid AND effective_date < :month_end"
+            ),
+            {"pid": project_id, "month_end": month_end},
+        )
+        return result.scalar_one()
+
+    async def total_bbs_planned(self, project_id: uuid.UUID) -> dict[str, Decimal]:
+        """Total BBS-planned kg per dia across the whole project -- the
+        aggregate ceiling the consumption+WIP finding checks against (the
+        per-element check happens at JMR entry; this catches drift that only
+        shows in the totals, e.g. consumption booked against elements that
+        have no plan at all)."""
         result = await self.session.execute(
             text(
                 """
-                SELECT COALESCE(SUM(weight_kg), 0) AS total_scrap_kg
-                FROM scrap_sale
-                WHERE project_id = :pid
-                  AND effective_date >= :month_start AND effective_date < :month_end
+                SELECT dg.diameter_mm AS dia, SUM(bp.planned_weight_kg) AS planned_kg
+                FROM bbs_plan bp JOIN dia_grades dg ON dg.id = bp.dia_grade_id
+                WHERE bp.project_id = :pid
+                GROUP BY dg.diameter_mm
                 """
             ),
-            {"pid": project_id, "month_start": month_start, "month_end": month_end},
+            {"pid": project_id},
+        )
+        return {str(r.dia): r.planned_kg for r in result.fetchall()}
+
+    async def cut_piece_kg_by_classification(
+        self, project_id: uuid.UUID, month_end: date
+    ) -> dict[str, Decimal]:
+        """{classification: total_kg} from the LATEST physical count per
+        contractor+dia (same 'latest, not summed' rule as sections I/J)."""
+        result = await self.session.execute(
+            text(
+                """
+                WITH latest AS (
+                    SELECT DISTINCT ON (contractor_id, dia_grade_id) id
+                    FROM physical_count
+                    WHERE project_id = :pid AND effective_date <= :month_end
+                    ORDER BY contractor_id, dia_grade_id, effective_date DESC
+                )
+                SELECT cp.classification, COALESCE(SUM(cp.nos * cp.weight_kg), 0) AS total_kg
+                FROM latest l JOIN physical_count_cut_piece cp ON cp.physical_count_id = l.id
+                GROUP BY cp.classification
+                """
+            ),
+            {"pid": project_id, "month_end": month_end},
+        )
+        return {r.classification: r.total_kg for r in result.fetchall()}
+
+    async def safety_backup_planned_kg(self, project_id: uuid.UUID) -> Decimal:
+        """Total planned safety-steel kg from imported backup workbooks --
+        identified by source_file (the bulk importer stamps it; the real APAS
+        backup is 'Misc Works Back Up/Steel Qty-Safety-...xlsx'). Zero means
+        no safety backup has been imported yet."""
+        result = await self.session.execute(
+            text(
+                "SELECT COALESCE(SUM(planned_weight_kg), 0) FROM bbs_plan "
+                "WHERE project_id = :pid AND source_file ILIKE '%safety%'"
+            ),
+            {"pid": project_id},
         )
         return result.scalar_one()
+
+    async def contract_wastage_cap_pct(self, project_id: uuid.UUID) -> Decimal | None:
+        result = await self.session.execute(
+            text("SELECT contract_wastage_pct FROM projects WHERE id = :pid"),
+            {"pid": project_id},
+        )
+        return result.scalar_one_or_none()
 
     async def bbs_vs_jmr_comparison(self, project_id: uuid.UUID) -> list[dict]:
         """BBS-planned vs JMR-actual side by side per tower/floor/dia (PRD
@@ -232,7 +307,9 @@ class AbstractRepository:
                 ) bp
                 FULL OUTER JOIN (
                     SELECT tower_id, floor_id, dia_grade_id, SUM(measured_weight_kg) AS actual_kg
-                    FROM jmr_actual WHERE project_id = :pid GROUP BY tower_id, floor_id, dia_grade_id
+                    FROM jmr_actual j WHERE project_id = :pid
+                      AND NOT EXISTS (SELECT 1 FROM jmr_actual j2 WHERE j2.corrected_from_id = j.id)
+                    GROUP BY tower_id, floor_id, dia_grade_id
                 ) ja ON ja.tower_id = bp.tower_id AND ja.floor_id = bp.floor_id
                      AND ja.dia_grade_id = bp.dia_grade_id
                 JOIN dia_grades dg ON dg.id = COALESCE(bp.dia_grade_id, ja.dia_grade_id)

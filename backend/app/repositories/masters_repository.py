@@ -53,3 +53,35 @@ class RuleThresholdRepository(BaseRepository[RuleThreshold]):
             )
         )
         return default_row.scalar_one_or_none()
+
+    async def get_value(self, rule_name: str, project_id: uuid.UUID, threshold_key: str):
+        """Numeric tunable for a rule (e.g. tolerance_pct), same project-override-
+        then-global-default resolution as get_mode. Returns Decimal | None; None
+        means the rule's own in-code default applies.
+
+        Added 2026-07-14: until then only 'mode' was ever read back, so the
+        numeric thresholds this table was built to carry (its docstring even
+        names them) were silently dead config -- a rule_thresholds tolerance row
+        changed nothing.
+        """
+        project_row = await self.session.execute(
+            select(RuleThreshold.threshold_value).where(
+                RuleThreshold.rule_name == rule_name,
+                RuleThreshold.threshold_key == threshold_key,
+                RuleThreshold.project_id == project_id,
+                RuleThreshold.is_active.is_(True),
+            )
+        )
+        value = project_row.scalar_one_or_none()
+        if value is not None:
+            return value
+
+        default_row = await self.session.execute(
+            select(RuleThreshold.threshold_value).where(
+                RuleThreshold.rule_name == rule_name,
+                RuleThreshold.threshold_key == threshold_key,
+                RuleThreshold.project_id.is_(None),
+                RuleThreshold.is_active.is_(True),
+            )
+        )
+        return default_row.scalar_one_or_none()

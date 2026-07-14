@@ -213,11 +213,15 @@ export interface JmrActualCreate {
   pour_number?: string | null
   drawing_ref?: string | null
   effective_date: string
+  /** Set when this entry re-states an earlier one — the original stays for
+   * audit but stops counting in the Abstract and rule checks. */
+  corrected_from_id?: string | null
 }
 
 export interface JmrActual extends JmrActualCreate {
   id: string
   created_at: string
+  warning: string | null
 }
 
 // ---- Physical Count ----
@@ -375,7 +379,19 @@ export interface AbstractResponse {
   section_l_wastage_qty: Record<string, string>
   section_m_wastage_pct: string | null
   section_n_scrap_sold_kg: string
+  findings: AbstractFinding[]
   pipeline_version: string
+}
+
+/** Aggregate cross-check computed over the whole Abstract — advisory,
+ * annotates the report without blocking it. */
+export interface AbstractFinding {
+  rule: string
+  severity: string
+  dia: string | null
+  actual_kg: string
+  threshold_kg: string
+  message: string
 }
 
 export interface FinalizeResponse {
@@ -410,4 +426,25 @@ export interface Floor {
   tower_id: string
   level_name: string
   sequence: number
+}
+
+export type ElementType =
+  | "footing"
+  | "column"
+  | "shear_wall"
+  | "slab"
+  | "staircase"
+  | "ramp"
+  | "retaining_wall"
+  | "beam"
+  | "podium"
+  | "misc"
+
+export interface Element {
+  id: string
+  project_id: string
+  tower_id: string
+  floor_id: string
+  element_type: ElementType
+  name: string
 }

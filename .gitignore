@@ -33,6 +33,7 @@ venv/
 # AI / Tool configs
 # ========================
 .claude/
+.agents/
 .gemini/
 .mcp.json
 
@@ -59,3 +60,24 @@ backend/.env.local
 # ========================
 *.log
 npm-debug.log*
+
+# ========================
+# Remotion / Videos
+# ========================
+videos/out/
+videos/node_modules/
+
+# ========================
+# Tool / AI configs and credentials
+# ========================
+.codex/
+.opencode/
+opencode.json
+skills-lock.json
+
+# ========================
+# Local/reference data files
+# ========================
+GRN_rebar_APAS.xlsx
+docs_scanned_M99.pdf
+

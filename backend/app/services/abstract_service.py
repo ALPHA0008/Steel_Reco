@@ -10,15 +10,15 @@ from app.schemas.abstract import AbstractResponse
 PIPELINE_VERSION = "abstract@v1"
 
 
-def _month_bounds(year: int, month: int) -> tuple[date, date]:
-    """month_start/month_end as plain dates, computed here -- never
-    date_trunc(...) in a WHERE clause (plan §3.4/§4's sargability note)."""
-    month_start = date(year, month, 1)
+def _month_end(year: int, month: int) -> date:
+    """Exclusive upper bound for the requested period, computed here -- never
+    date_trunc(...) in a WHERE clause (plan §3.4/§4's sargability note).
+    Every section is cumulative from project start through this date (no
+    opening-balance concept, per the documented cumulative-ledger decision
+    and the real Excel's own behavior) -- there is no month_start."""
     if month == 12:
-        month_end = date(year + 1, 1, 1)
-    else:
-        month_end = date(year, month + 1, 1)
-    return month_start, month_end
+        return date(year + 1, 1, 1)
+    return date(year, month + 1, 1)
 
 
 def _sum_by_dia(rows: list[dict], key: str) -> dict[str, Decimal]:
@@ -42,15 +42,15 @@ class AbstractService:
         self._repo = AbstractRepository(session)
 
     async def compute(self, project_id: uuid.UUID, year: int, month: int) -> AbstractResponse:
-        month_start, month_end = _month_bounds(year, month)
+        month_end = _month_end(year, month)
 
-        section_a = await self._repo.section_a_received(project_id, month_start, month_end)
-        section_b = await self._repo.section_b_transferred(project_id, month_start, month_end)
-        section_d = await self._repo.section_d_issued(project_id, month_start, month_end)
-        section_e = await self._repo.section_e_consumption(project_id, month_start, month_end)
+        section_a = await self._repo.section_a_received(project_id, month_end)
+        section_b = await self._repo.section_b_transferred(project_id, month_end)
+        section_d = await self._repo.section_d_issued(project_id, month_end)
+        section_e = await self._repo.section_e_consumption(project_id, month_end)
         section_f = await self._repo.section_f_wip(project_id, month_end)
         sections_ij = await self._repo.sections_ij_physical_stock(project_id, month_end)
-        scrap_kg = await self._repo.section_n_scrap_sold(project_id, month_start, month_end)
+        scrap_kg = await self._repo.section_n_scrap_sold(project_id, month_end)
 
         a_by_dia = _sum_by_dia(section_a, "total_received_kg")
         b_by_dia = _sum_by_dia(section_b, "total_transferred_kg")
@@ -87,6 +87,10 @@ class AbstractService:
         total_g = sum(g_by_dia.values(), Decimal("0"))
         m_wastage_pct = (total_k / total_g * 100) if total_g != 0 else None
 
+        findings = await self._compute_findings(
+            project_id, month_end, g_by_dia, l_by_dia, m_wastage_pct, scrap_kg
+        )
+
         return AbstractResponse(
             project_id=str(project_id),
             year=year,
@@ -105,5 +109,134 @@ class AbstractService:
             section_l_wastage_qty=l_by_dia,
             section_m_wastage_pct=m_wastage_pct,
             section_n_scrap_sold_kg=scrap_kg,
+            findings=findings,
             pipeline_version=PIPELINE_VERSION,
         )
+
+    # Aggregate cross-checks over the whole computed Abstract -- the per-entry
+    # rules (issue>stock, JMR-vs-BBS, ...) fire row by row at save time; these
+    # catch what only shows in the totals. Advisory presentation: they never
+    # block viewing the Abstract, they name what doesn't reconcile.
+    #
+    # Aggregate tolerance is 10%, matching the per-entry JMR-vs-BBS default --
+    # the entry rule tolerates each element drifting 10%, so the sum may
+    # legitimately drift up to the same fraction before it means anything new.
+    AGGREGATE_TOLERANCE = Decimal("0.10")
+
+    async def _compute_findings(
+        self,
+        project_id: uuid.UUID,
+        month_end: date,
+        g_by_dia: dict[str, Decimal],
+        l_by_dia: dict[str, Decimal],
+        m_wastage_pct: Decimal | None,
+        scrap_sold_kg: Decimal,
+    ) -> list[dict]:
+        findings: list[dict] = []
+
+        # 1. Consumption + WIP vs total BBS plan, per dia. Two distinct
+        # failure shapes: booked steel exceeds everything that was ever
+        # planned for that dia, or steel is booked against a dia with no
+        # plan imported at all (unverifiable, which is itself a finding).
+        planned_by_dia = await self._repo.total_bbs_planned(project_id)
+        for dia, g_kg in sorted(g_by_dia.items()):
+            if g_kg <= 0:
+                continue
+            planned = planned_by_dia.get(dia, Decimal("0"))
+            if planned <= 0:
+                findings.append({
+                    "rule": "consumption_without_bbs_plan",
+                    "severity": "warning",
+                    "dia": dia,
+                    "actual_kg": str(g_kg),
+                    "threshold_kg": "0",
+                    "message": (
+                        f"{dia}mm: {g_kg}kg consumption+WIP is booked but no BBS plan "
+                        "exists for this diameter -- nothing to verify it against"
+                    ),
+                })
+            elif g_kg > planned * (1 + self.AGGREGATE_TOLERANCE):
+                findings.append({
+                    "rule": "consumption_wip_exceeds_bbs",
+                    "severity": "warning",
+                    "dia": dia,
+                    "actual_kg": str(g_kg),
+                    "threshold_kg": str(planned),
+                    "message": (
+                        f"{dia}mm: consumption+WIP ({g_kg}kg) exceeds the total "
+                        f"BBS-planned quantity ({planned}kg) beyond the "
+                        f"{self.AGGREGATE_TOLERANCE * 100:.0f}% tolerance"
+                    ),
+                })
+
+        # 2. Wastage % vs the contract cap -- previously display-only (a red
+        # dashboard KPI); as a finding it is part of the Abstract itself.
+        cap = await self._repo.contract_wastage_cap_pct(project_id)
+        if m_wastage_pct is not None and cap is not None and m_wastage_pct > cap:
+            findings.append({
+                "rule": "wastage_over_contract_cap",
+                "severity": "warning",
+                "dia": None,
+                "actual_kg": str(m_wastage_pct),
+                "threshold_kg": str(cap),
+                "message": (
+                    f"Wastage {m_wastage_pct:.2f}% is over the contractual "
+                    f"{cap}% cap -- the excess is deductible from the contractor's RA bill"
+                ),
+            })
+
+        # 3. Scrap sold vs scrap plausibly generated: wastage (L, clamped at
+        # zero per dia -- negative L means a data problem, not negative scrap)
+        # plus scrap-classified cut pieces. Selling more than that is the
+        # classic leakage shape.
+        cut_by_class = await self._repo.cut_piece_kg_by_classification(project_id, month_end)
+        scrap_generated = sum(
+            (max(v, Decimal("0")) for v in l_by_dia.values()), Decimal("0")
+        ) + cut_by_class.get("scrap", Decimal("0"))
+        if scrap_sold_kg > scrap_generated:
+            findings.append({
+                "rule": "scrap_sold_exceeds_generated",
+                "severity": "warning",
+                "dia": None,
+                "actual_kg": str(scrap_sold_kg),
+                "threshold_kg": str(scrap_generated),
+                "message": (
+                    f"Scrap sold ({scrap_sold_kg}kg) exceeds scrap plausibly generated "
+                    f"({scrap_generated}kg = wastage + scrap-classified cut pieces) -- "
+                    "either sales are overstated or wastage/cut-piece records are missing"
+                ),
+            })
+
+        # 4. Safety-steel classification vs the imported safety backup: the
+        # classification is self-declared at physical count; the backup
+        # workbook is what makes it verifiable.
+        safety_claimed = cut_by_class.get("used_as_safety_steel", Decimal("0"))
+        if safety_claimed > 0:
+            safety_backup = await self._repo.safety_backup_planned_kg(project_id)
+            if safety_backup <= 0:
+                findings.append({
+                    "rule": "safety_steel_unverifiable",
+                    "severity": "warning",
+                    "dia": None,
+                    "actual_kg": str(safety_claimed),
+                    "threshold_kg": "0",
+                    "message": (
+                        f"{safety_claimed}kg of cut pieces are classified 'used as safety steel' "
+                        "but no safety-steel backup workbook has been imported to verify against"
+                    ),
+                })
+            elif safety_claimed > safety_backup * (1 + self.AGGREGATE_TOLERANCE):
+                findings.append({
+                    "rule": "safety_steel_exceeds_backup",
+                    "severity": "warning",
+                    "dia": None,
+                    "actual_kg": str(safety_claimed),
+                    "threshold_kg": str(safety_backup),
+                    "message": (
+                        f"Cut pieces classified as safety steel ({safety_claimed}kg) exceed "
+                        f"the safety-steel backup total ({safety_backup}kg) beyond tolerance -- "
+                        "safety classification may be hiding wastage"
+                    ),
+                })
+
+        return findings

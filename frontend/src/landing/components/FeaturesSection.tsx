@@ -1,28 +1,7 @@
-import { useEffect, useRef } from "react"
-import {
-  animate,
-  motion,
-  useInView,
-  useMotionValue,
-  useTransform,
-  type Variants,
-} from "motion/react"
+import { motion, type Variants } from "motion/react"
 import { FileCheck2, Lock, Scale, Scissors } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-/* Count-up that runs once, when the tile scrolls into view. */
-function CountUp({ to, decimals = 2, className }: { to: number; decimals?: number; className?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true, margin: "-60px" })
-  const mv = useMotionValue(0)
-  const text = useTransform(mv, (v) => v.toFixed(decimals))
-  useEffect(() => {
-    if (!inView) return
-    const controls = animate(mv, to, { duration: 1.4, ease: [0.2, 0, 0, 1] })
-    return () => controls.stop()
-  }, [inView, to, mv])
-  return <motion.span ref={ref} className={className}>{text}</motion.span>
-}
+import { CountUp } from "./CountUp"
 
 /* Exception chips that slide in on view — the "everything surfaces" idea, live. */
 const EXCEPTIONS = [
@@ -41,7 +20,7 @@ const tile: Variants = {
 }
 
 const tileBase =
-  "group relative overflow-hidden rounded-3xl border border-border bg-white p-7 shadow-[0_1px_3px_rgba(20,20,22,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-brand-border hover:shadow-[0_18px_44px_rgba(20,20,22,0.10)]"
+  "group relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-border hover:shadow-[0_24px_56px_rgba(20,20,22,0.12)]"
 
 export function FeaturesSection() {
   return (
@@ -101,7 +80,7 @@ export function FeaturesSection() {
 
           {/* Tile 2 — genuine sum */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-2")}>
-            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-colors group-hover:bg-brand-subtle group-hover:text-brand">
+            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
               <Scale className="size-5" strokeWidth={1.8} />
             </span>
             <h3 className="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-foreground">Issued is a real sum</h3>
@@ -112,7 +91,7 @@ export function FeaturesSection() {
 
           {/* Tile 3 — upstream reconciliation */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-2")}>
-            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-colors group-hover:bg-brand-subtle group-hover:text-brand">
+            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
               <FileCheck2 className="size-5" strokeWidth={1.8} />
             </span>
             <h3 className="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-foreground">Upstream checks</h3>
@@ -153,7 +132,7 @@ export function FeaturesSection() {
           {/* Tile 5 — cut pieces */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-3")}>
             <div className="flex items-start gap-4">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-colors group-hover:bg-brand-subtle group-hover:text-brand">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
                 <Scissors className="size-5" strokeWidth={1.8} />
               </span>
               <div>
@@ -168,7 +147,7 @@ export function FeaturesSection() {
           {/* Tile 6 — months lock */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-3")}>
             <div className="flex items-start gap-4">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-colors group-hover:bg-brand-subtle group-hover:text-brand">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
                 <Lock className="size-5" strokeWidth={1.8} />
               </span>
               <div>

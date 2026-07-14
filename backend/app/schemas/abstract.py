@@ -28,4 +28,10 @@ class AbstractResponse(BaseModel):
     section_m_wastage_pct: Decimal | None  # literal file formula: K / G (plan §4 note)
     section_n_scrap_sold_kg: Decimal
 
+    # Aggregate cross-checks computed over the whole Abstract (E+F vs BBS,
+    # wastage vs contract cap, scrap sold vs generated, safety steel vs
+    # backup) -- each {rule, severity, dia?, actual_kg, threshold_kg, message}.
+    # Advisory: they annotate the Abstract, never block it.
+    findings: list[dict]
+
     pipeline_version: str

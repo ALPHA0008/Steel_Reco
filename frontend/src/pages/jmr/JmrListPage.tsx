@@ -1,6 +1,6 @@
 import { useMemo } from "react"
-import { Link } from "react-router-dom"
-import { ClipboardCheck, Plus } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { ClipboardCheck, Pencil, Plus } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
 import { DataTable, type Column } from "@/components/app/data-table"
 import { EmptyState } from "@/components/app/empty-state"
@@ -12,10 +12,18 @@ import { apiErrorMessage } from "@/lib/api"
 import type { JmrActual } from "@/lib/types"
 
 export function JmrListPage() {
+  const navigate = useNavigate()
   const jmrs = useJmrActuals()
   const towers = useTowers()
   const dias = useDiaGrades()
   const contractors = useContractors()
+
+  // Rows another row has corrected: still listed (audit trail) but struck
+  // through — they no longer count toward the Abstract or the rule checks.
+  const supersededIds = useMemo(
+    () => new Set((jmrs.data ?? []).map((r) => r.corrected_from_id).filter(Boolean)),
+    [jmrs.data],
+  )
 
   const towerById = useMemo(() => new Map((towers.data ?? []).map((t) => [t.id, t])), [towers.data])
   const diaById = useMemo(() => new Map((dias.data ?? []).map((d) => [d.id, d])), [dias.data])
@@ -37,12 +45,33 @@ export function JmrListPage() {
       key: "measured",
       header: "Measured (kg)",
       numeric: true,
-      render: (r) => formatKg(r.measured_weight_kg),
+      render: (r) => (
+        <span className={supersededIds.has(r.id) ? "text-muted-foreground line-through" : undefined}>
+          {formatKg(r.measured_weight_kg)}
+        </span>
+      ),
     },
     {
       key: "contractor",
       header: "Contractor",
       render: (r) => (r.contractor_id ? contractorById.get(r.contractor_id)?.name ?? "—" : "—"),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (r) =>
+        supersededIds.has(r.id) ? (
+          <span className="text-xs text-muted-foreground">Superseded</span>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/jmr/new", { state: { correctFrom: r } })}
+          >
+            <Pencil /> Correct
+          </Button>
+        ),
     },
   ]
 

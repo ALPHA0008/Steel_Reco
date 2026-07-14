@@ -187,6 +187,15 @@ export function AbstractPage() {
         </Banner>
       )}
 
+      {/* Aggregate cross-checks: what the computed totals say doesn't
+          reconcile (E+F vs BBS, wastage vs cap, scrap vs generated, safety
+          steel vs backup). Advisory — the Abstract still renders below. */}
+      {(abstract.data?.findings ?? []).map((f, i) => (
+        <Banner key={`${f.rule}-${f.dia ?? "all"}-${i}`} variant="advisory" className="mb-3">
+          {f.message}
+        </Banner>
+      ))}
+
       <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
         {abstract.isLoading || !built ? (
           <div className="space-y-2 p-5">

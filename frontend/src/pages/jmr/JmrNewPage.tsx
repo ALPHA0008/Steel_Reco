@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
@@ -19,29 +19,41 @@ import {
   useContractors,
   useCreateJmrActual,
   useDiaGrades,
+  useElements,
   useFloors,
   useTowers,
   diaLabel,
 } from "@/lib/queries"
 import { apiErrorMessage, apiFieldErrors } from "@/lib/api"
+import type { JmrActual } from "@/lib/types"
 
 export function JmrNewPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const towers = useTowers()
   const dias = useDiaGrades()
   const contractors = useContractors()
   const createJmr = useCreateJmrActual()
 
-  const [towerId, setTowerId] = useState("")
+  // Correction mode: JmrListPage navigates here with the row being re-stated.
+  // Everything prefills from the original; the QS changes what was wrong and
+  // saves -- the new row supersedes the old one (which stops counting).
+  const correctFrom = (location.state as { correctFrom?: JmrActual } | null)?.correctFrom ?? null
+
+  const [towerId, setTowerId] = useState(correctFrom?.tower_id ?? "")
   const floors = useFloors(towerId || undefined)
-  const [floorId, setFloorId] = useState("")
-  const [barMark, setBarMark] = useState("")
-  const [pourNumber, setPourNumber] = useState("")
-  const [diaId, setDiaId] = useState("")
-  const [measuredWeight, setMeasuredWeight] = useState("")
-  const [drawingRef, setDrawingRef] = useState("")
-  const [contractorId, setContractorId] = useState("")
-  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [floorId, setFloorId] = useState(correctFrom?.floor_id ?? "")
+  const elements = useElements(floorId || undefined)
+  const [elementId, setElementId] = useState(correctFrom?.element_id ?? "")
+  const [barMark, setBarMark] = useState(correctFrom?.bar_mark ?? "")
+  const [pourNumber, setPourNumber] = useState(correctFrom?.pour_number ?? "")
+  const [diaId, setDiaId] = useState(correctFrom?.dia_grade_id ?? "")
+  const [measuredWeight, setMeasuredWeight] = useState(correctFrom?.measured_weight_kg ?? "")
+  const [drawingRef, setDrawingRef] = useState(correctFrom?.drawing_ref ?? "")
+  const [contractorId, setContractorId] = useState(correctFrom?.contractor_id ?? "")
+  const [effectiveDate, setEffectiveDate] = useState(
+    () => correctFrom?.effective_date ?? new Date().toISOString().slice(0, 10),
+  )
 
   const [banner, setBanner] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -63,9 +75,10 @@ export function JmrNewPage() {
     }
 
     try {
-      await createJmr.mutateAsync({
+      const created = await createJmr.mutateAsync({
         tower_id: towerId,
         floor_id: floorId,
+        element_id: elementId || null,
         bar_mark: barMark.trim() || null,
         dia_grade_id: diaId,
         measured_weight_kg: measuredWeight,
@@ -73,8 +86,12 @@ export function JmrNewPage() {
         pour_number: pourNumber.trim() || null,
         drawing_ref: drawingRef.trim() || null,
         effective_date: effectiveDate,
+        corrected_from_id: correctFrom?.id ?? null,
       })
-      toast.success("JMR row added.")
+      toast.success(correctFrom ? "Correction saved — the original entry is superseded." : "JMR row added.")
+      if (created.warning) {
+        toast.warning(created.warning, { duration: 8000 })
+      }
       navigate("/jmr")
     } catch (err) {
       setFieldErrors(apiFieldErrors(err))
@@ -85,8 +102,12 @@ export function JmrNewPage() {
   return (
     <Page>
       <PageHeader
-        title="Add JMR Row"
-        description="A jointly measured quantity, signed by QS and contractor."
+        title={correctFrom ? "Correct JMR Row" : "Add JMR Row"}
+        description={
+          correctFrom
+            ? `Re-stating the ${correctFrom.effective_date} entry — the original stays in the audit trail but stops counting in the Abstract.`
+            : "A jointly measured quantity, signed by QS and contractor."
+        }
         actions={
           <Button variant="outline" asChild>
             <Link to="/jmr">
@@ -112,6 +133,7 @@ export function JmrNewPage() {
                     onValueChange={(v) => {
                       setTowerId(v)
                       setFloorId("")
+                      setElementId("")
                     }}
                   >
                     <SelectTrigger id={p.id} aria-invalid={p["aria-invalid"]} className="w-full">
@@ -132,7 +154,14 @@ export function JmrNewPage() {
                 required
                 error={fieldErrors.floor_id}
                 render={(p) => (
-                  <Select value={floorId} onValueChange={setFloorId} disabled={!towerId}>
+                  <Select
+                    value={floorId}
+                    onValueChange={(v) => {
+                      setFloorId(v)
+                      setElementId("")
+                    }}
+                    disabled={!towerId}
+                  >
                     <SelectTrigger id={p.id} aria-invalid={p["aria-invalid"]} className="w-full">
                       <SelectValue
                         placeholder={!towerId ? "Pick a tower first" : floors.isLoading ? "Loading…" : "Select floor"}
@@ -149,6 +178,28 @@ export function JmrNewPage() {
                 )}
               />
             </div>
+
+            <Field
+              label="Element"
+              error={fieldErrors.element_id}
+              description="Optional, but required for BBS-plan and duplicate-pour checks — an entry with no element can't be validated against the plan."
+              render={(p) => (
+                <Select value={elementId} onValueChange={setElementId} disabled={!floorId}>
+                  <SelectTrigger id={p.id} className="w-full">
+                    <SelectValue
+                      placeholder={!floorId ? "Pick a floor first" : elements.isLoading ? "Loading…" : "Optional"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(elements.data ?? []).map((el) => (
+                      <SelectItem key={el.id} value={el.id}>
+                        {el.name} · {el.element_type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <Field

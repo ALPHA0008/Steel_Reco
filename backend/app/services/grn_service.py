@@ -60,13 +60,21 @@ class GrnService:
             derived["cumulative_accepted_kg"] = existing + payload.weighbridge_weight_kg
 
         mode = await self._thresholds.get_mode("inbound_reconciliation", self._project_id)
+        tolerance = await self._thresholds.get_value(
+            "inbound_reconciliation", self._project_id, "tolerance_pct"
+        )
+        thresholds: dict = {}
+        if mode is not None:
+            thresholds["mode"] = mode
+        if tolerance is not None:
+            thresholds["tolerance_pct"] = tolerance
         ctx = RuleContext(
             project_id=self._project_id,
             transaction_type="grn",
             transaction_id=None,
             payload={"weighbridge_weight_kg": payload.weighbridge_weight_kg},
             derived=derived,
-            thresholds={"mode": mode} if mode is not None else {},
+            thresholds=thresholds,
         )
         results = await self._engine.evaluate(ctx)
 

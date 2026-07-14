@@ -17,6 +17,10 @@ class Project(UUIDPkMixin, CreatedAtMixin, Base):
     location: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     contract_wastage_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("3.00"))
+    signup_code: Mapped[str | None] = mapped_column(String(32))
+    """Gates self-service QS signup to this project (migration 0006). None
+    until an admin sets one; a project with no code cannot be signed up
+    against."""
 
 
 class Tower(UUIDPkMixin, CreatedAtMixin, Base):

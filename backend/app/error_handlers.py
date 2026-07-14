@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.exceptions import BlockingRuleViolation, MonthLocked, NotFoundError, ProjectMismatch
+from app.exceptions import AlreadyCorrected, BlockingRuleViolation, MonthLocked, NotFoundError, ProjectMismatch
 from app.services.month_close_service import AlreadyFinalized, NotFinalized
 
 
@@ -39,6 +39,10 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(NotFoundError)
     async def _not_found(request: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=_envelope("not_found", str(exc)))
+
+    @app.exception_handler(AlreadyCorrected)
+    async def _already_corrected(request: Request, exc: AlreadyCorrected) -> JSONResponse:
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=_envelope("already_corrected", str(exc)))
 
     @app.exception_handler(AlreadyFinalized)
     async def _already_finalized(request: Request, exc: AlreadyFinalized) -> JSONResponse:

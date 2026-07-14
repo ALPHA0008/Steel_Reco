@@ -155,6 +155,10 @@ class JmrActualCreate(BaseModel):
     pour_number: str | None = None
     drawing_ref: str | None = None
     effective_date: date
+    # Set when this entry re-states (supersedes) an earlier one. The original
+    # is kept for audit but excluded from every sum -- Abstract E, the BBS
+    # cumulative check, and the duplicate-pour count all read active rows only.
+    corrected_from_id: uuid.UUID | None = None
 
 
 class JmrActualResponse(BaseModel):
@@ -175,6 +179,7 @@ class JmrActualResponse(BaseModel):
     corrected_from_id: uuid.UUID | None
     created_by: uuid.UUID
     created_at: datetime
+    warning: str | None = None  # populated when an advisory rule fired (PRD story 15)
 
 
 class CutPieceCreate(BaseModel):

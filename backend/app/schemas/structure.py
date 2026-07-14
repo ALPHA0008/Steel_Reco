@@ -22,6 +22,20 @@ class ProjectResponse(BaseModel):
     created_at: datetime
 
 
+class ProjectPickerResponse(BaseModel):
+    """Minimal, public (unauthenticated) shape for the signup page's project
+    picker -- id + name only. A site's name being visible to anyone on the
+    signup page is an acceptable, minimal disclosure (site names aren't
+    secret); everything else about a project stays behind the signup code
+    and, after that, RLS.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+
 class TowerCreate(BaseModel):
     name: str
     sequence: int = 0

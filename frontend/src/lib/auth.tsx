@@ -13,8 +13,10 @@ import {
   fetchMe,
   getToken,
   login as apiLogin,
+  signup as apiSignup,
   setToken,
   type CurrentUser,
+  type SignupPayload,
 } from "./api"
 
 interface AuthState {
@@ -22,6 +24,7 @@ interface AuthState {
   /** true while restoring a persisted session on first load */
   loading: boolean
   login: (username: string, password: string) => Promise<void>
+  signup: (payload: SignupPayload) => Promise<void>
   logout: () => void
 }
 
@@ -57,12 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me)
   }, [])
 
+  const signup = useCallback(async (payload: SignupPayload) => {
+    const token = await apiSignup(payload)
+    setToken(token)
+    const me = await fetchMe()
+    setUser(me)
+  }, [])
+
   const logout = useCallback(() => {
     clearToken()
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout])
+  const value = useMemo(
+    () => ({ user, loading, login, signup, logout }),
+    [user, loading, login, signup, logout],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

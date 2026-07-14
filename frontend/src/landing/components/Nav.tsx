@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { Menu, X } from "lucide-react"
+import { LayoutDashboard, LogOut, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { Logo } from "./Logo"
 import { Wordmark } from "./Wordmark"
+import { AccountMenu } from "./AccountMenu"
 import { useScrollTo } from "../lib/smooth-scroll"
 
 const NAV_LINKS = [
@@ -19,11 +20,7 @@ export function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const scrollTo = useScrollTo()
-  const { user } = useAuth()
-
-  // Signed in already? Send straight into the tool instead of the login page.
-  const ctaTo = user ? "/dashboard" : "/login"
-  const ctaLabel = user ? "Open dashboard" : "Get Started"
+  const { user, logout } = useAuth()
 
   useEffect(() => {
     function onScroll() {
@@ -46,12 +43,12 @@ export function Nav() {
     <nav
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled ? "border-b border-border bg-white/85 shadow-sm backdrop-blur-xl" : "border-b border-transparent",
+        scrolled ? "border-b border-border bg-white/80 shadow-sm backdrop-blur-xl" : "border-b border-transparent",
       )}
     >
       <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between px-6">
-        {/* Left — logo + wordmark */}
-        <button onClick={() => go("#top")} className="flex items-center gap-2.5" aria-label="Niṣṭhā home">
+        {/* Left — logo mark + wordmark */}
+        <button onClick={() => go("#top")} className="flex items-center gap-2.5" aria-label="Digi Reco home">
           <Logo />
           <Wordmark className="text-[20px] text-foreground" />
         </button>
@@ -69,16 +66,22 @@ export function Nav() {
           ))}
         </div>
 
-        {/* Right — CTA */}
-        <Link
-          to={ctaTo}
-          className="hidden items-center rounded-full bg-brand px-7 py-3 text-[14.5px] font-semibold text-brand-foreground shadow-sm transition-all hover:bg-brand-hover hover:shadow-md md:inline-flex"
-        >
-          {ctaLabel}
-        </Link>
+        {/* Right — account menu when signed in, else the Get Started CTA */}
+        <div className="hidden md:block">
+          {user ? (
+            <AccountMenu showName />
+          ) : (
+            <Link
+              to="/login"
+              className="inline-flex items-center rounded-full bg-brand px-7 py-3 text-[14.5px] font-semibold text-brand-foreground shadow-sm transition-all hover:bg-brand-hover hover:shadow-md hover:shadow-brand/20"
+            >
+              Get Started
+            </Link>
+          )}
+        </div>
 
         <button
-          className="grid size-10 place-items-center rounded-lg border border-border text-foreground md:hidden"
+          className="grid size-10 place-items-center rounded-lg border border-border text-foreground transition-colors hover:bg-background md:hidden"
           onClick={() => setMobileOpen((o) => !o)}
           aria-label="Toggle menu"
         >
@@ -98,12 +101,29 @@ export function Nav() {
                 {link.label}
               </button>
             ))}
-            <Link
-              to={ctaTo}
-              className="mt-2 inline-flex items-center justify-center rounded-full bg-brand px-6 py-3 text-[14px] font-semibold text-brand-foreground"
-            >
-              {ctaLabel}
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-[14px] font-semibold text-brand-foreground"
+                >
+                  <LayoutDashboard className="size-4" /> Open dashboard
+                </Link>
+                <button
+                  onClick={logout}
+                  className="mt-1 inline-flex items-center justify-center gap-2 rounded-full border border-border px-6 py-3 text-[14px] font-semibold text-foreground"
+                >
+                  <LogOut className="size-4" /> Sign out
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="mt-2 inline-flex items-center justify-center rounded-full bg-brand px-6 py-3 text-[14px] font-semibold text-brand-foreground"
+              >
+                Get Started
+              </Link>
+            )}
           </div>
         </div>
       )}

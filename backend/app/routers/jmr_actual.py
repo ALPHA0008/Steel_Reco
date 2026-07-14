@@ -20,5 +20,7 @@ async def create_jmr_actual(
 ) -> JmrActualResponse:
     user_id, _role = current_user
     service = JmrActualService(session, project_id, user_id)
-    actual = await service.create(payload)
-    return JmrActualResponse.model_validate(actual)
+    actual, warning = await service.create(payload)
+    response = JmrActualResponse.model_validate(actual)
+    response.warning = warning
+    return response

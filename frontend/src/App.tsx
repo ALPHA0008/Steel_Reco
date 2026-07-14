@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { AuthProvider, RequireAuth } from "@/lib/auth"
 import { AppShell } from "@/components/layout/AppShell"
 import { LoginPage } from "@/pages/LoginPage"
+import { SignupPage } from "@/pages/SignupPage"
 
 // Landing page is lazy — it pulls in Framer Motion + Lenis + Fraunces, none of
 // which the authenticated tool needs. Keeps the app bundle lean.
@@ -63,6 +64,9 @@ const PhysicalCountNewPage = lazy(() =>
 const ScrapListPage = lazy(() => import("@/pages/scrap/ScrapListPage").then((m) => ({ default: m.ScrapListPage })))
 const ScrapNewPage = lazy(() => import("@/pages/scrap/ScrapNewPage").then((m) => ({ default: m.ScrapNewPage })))
 const AbstractPage = lazy(() => import("@/pages/abstract/AbstractPage").then((m) => ({ default: m.AbstractPage })))
+const AdminUsersPage = lazy(() =>
+  import("@/pages/admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
+)
 
 function RouteFallback() {
   return (
@@ -81,6 +85,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
               <Route
                 element={
                   <RequireAuth>
@@ -109,6 +114,7 @@ export default function App() {
                 <Route path="/scrap" element={<ScrapListPage />} />
                 <Route path="/scrap/new" element={<ScrapNewPage />} />
                 <Route path="/abstract" element={<AbstractPage />} />
+                <Route path="/admin/users" element={<AdminUsersPage />} />
                 <Route path="/styleguide" element={<StyleguidePage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
