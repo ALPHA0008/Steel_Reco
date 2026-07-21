@@ -50,6 +50,10 @@ class _Cache:
     # project_id (str) -> snapshot; plus a global "computed the full set" stamp
     full_set_at: float = 0.0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # The full executive-analytics payload (build_admin_analytics()).
+    analytics: dict | None = None
+    analytics_at: float = 0.0
+    analytics_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 _cache = _Cache()
@@ -57,6 +61,21 @@ _cache = _Cache()
 
 def is_fresh(ts: float) -> bool:
     return (time.monotonic() - ts) < TTL_SECONDS
+
+
+def get_analytics() -> dict | None:
+    if _cache.analytics is not None and is_fresh(_cache.analytics_at):
+        return _cache.analytics
+    return None
+
+
+def put_analytics(payload: dict) -> None:
+    _cache.analytics = payload
+    _cache.analytics_at = time.monotonic()
+
+
+def analytics_lock() -> asyncio.Lock:
+    return _cache.analytics_lock
 
 
 def get_site(project_id: str) -> _SiteSnapshot | None:
@@ -112,6 +131,8 @@ def invalidate() -> None:
     """Drop everything -- call after a known data change to force recompute."""
     _cache.sites.clear()
     _cache.full_set_at = 0.0
+    _cache.analytics = None
+    _cache.analytics_at = 0.0
 
 
 def lock() -> asyncio.Lock:

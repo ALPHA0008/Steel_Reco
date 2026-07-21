@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   api,
+  fetchAdminAnalytics,
   fetchAdminMasterSummary,
   fetchAdminSites,
   fetchAdminSiteSummary,
@@ -294,6 +295,16 @@ export function useAdminMasterSummary() {
   return useQuery({
     queryKey: ["admin-master-summary"],
     queryFn: fetchAdminMasterSummary,
+    staleTime: 60 * 1000,
+  })
+}
+
+/** The single rich executive-analytics payload powering the redesigned admin
+ * dashboard (portfolio health, insights, every visualization's data). */
+export function useAdminAnalytics() {
+  return useQuery({
+    queryKey: ["admin-analytics"],
+    queryFn: fetchAdminAnalytics,
     staleTime: 60 * 1000,
   })
 }
