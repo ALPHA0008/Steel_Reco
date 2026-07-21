@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react"
-import { ArrowUpDown, Building2, Search } from "lucide-react"
+import { ArrowUpDown, Building2, Filter, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Sparkline } from "@/components/app/sparkline"
 import { cn } from "@/lib/utils"
@@ -29,9 +29,15 @@ function fmt(n: number): string {
 export function SiteExplorer({
   sites,
   onOpen,
+  activeId,
+  onFilter,
 }: {
   sites: AnalyticsSite[]
   onOpen: (site: AnalyticsSite) => void
+  /** currently cross-filtered site (highlighted) */
+  activeId?: string | null
+  /** toggle the dashboard cross-filter to this site */
+  onFilter?: (id: string | null) => void
 }) {
   const [query, setQuery] = useState("")
   const [risk, setRisk] = useState<RiskFilter>("all")
@@ -128,6 +134,7 @@ export function SiteExplorer({
               <Th k="received_mt" numeric>Received</Th>
               <Th k="scrap_mt" numeric>Scrap</Th>
               <Th k="open_exceptions" numeric>Exceptions</Th>
+              <th className="sticky top-0 z-10 h-9 border-b bg-muted/80 px-2 backdrop-blur" />
             </tr>
           </thead>
           <tbody>
@@ -135,7 +142,10 @@ export function SiteExplorer({
               <tr
                 key={s.project_id}
                 onClick={() => onOpen(s)}
-                className="cursor-pointer border-b transition-colors odd:bg-row-stripe hover:bg-row-hover"
+                className={cn(
+                  "group cursor-pointer border-b transition-colors hover:bg-row-hover",
+                  activeId === s.project_id ? "bg-brand-subtle" : "odd:bg-row-stripe",
+                )}
               >
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
@@ -178,11 +188,28 @@ export function SiteExplorer({
                     {s.open_exceptions.toLocaleString("en-IN")}
                   </span>
                 </td>
+                <td className="px-2 text-right">
+                  {onFilter && (
+                    <button
+                      type="button"
+                      title={activeId === s.project_id ? "Clear filter" : "Filter dashboard to this site"}
+                      onClick={(e) => { e.stopPropagation(); onFilter(activeId === s.project_id ? null : s.project_id) }}
+                      className={cn(
+                        "rounded-md p-1.5 transition-colors",
+                        activeId === s.project_id
+                          ? "text-brand-text"
+                          : "text-muted-foreground opacity-0 hover:bg-muted group-hover:opacity-100",
+                      )}
+                    >
+                      <Filter className="size-3.5" />
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-10 text-center text-[13px] text-muted-foreground">
+                <td colSpan={9} className="py-10 text-center text-[13px] text-muted-foreground">
                   No sites match your filters.
                 </td>
               </tr>

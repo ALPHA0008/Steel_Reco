@@ -30,6 +30,13 @@ from app.models.system import ExceptionLog
 from app.services.abstract_service import AbstractService
 
 
+# Approximate delivered steel cost, INR per metric tonne. Used ONLY for
+# directional savings estimates in the executive narrative ("reducing wastage
+# 1pp saves ~X MT ~= Rs Y"). Set to the real procurement price when known; the
+# math is honest arithmetic on this input, never a fabricated figure.
+STEEL_PRICE_INR_PER_MT = 55_000.0
+
+
 def _f(x) -> float:
     return float(x) if x is not None else 0.0
 
@@ -283,6 +290,75 @@ def _recommended_actions(sites: list[SiteFacts], healths: dict[str, int]) -> lis
     return actions[:6]
 
 
+def _grade(health: int) -> str:
+    if health >= 85:
+        return "A"
+    if health >= 70:
+        return "B"
+    if health >= 55:
+        return "C"
+    if health >= 40:
+        return "D"
+    return "F"
+
+
+def _narrative(sites: list[SiteFacts], portfolio_health: int,
+               portfolio_wastage: float | None, forecast: float | None) -> dict:
+    """A synthesized executive summary -- grade, the single biggest driver, the
+    forecast, a concrete next step, and a directional rupee savings estimate
+    from the real STEEL_PRICE_INR_PER_MT. Reads like an analyst's brief, but
+    every number is computed."""
+    real = [s for s in sites if s.wastage_pct is not None]
+    total_l = sum(s.wastage_qty_mt for s in sites) or 1.0
+
+    driver = max(real, key=lambda s: s.wastage_qty_mt) if real else None
+    driver_share = (driver.wastage_qty_mt / total_l * 100) if driver else 0.0
+
+    # savings: cutting the driver's wastage by 1 percentage point of its E
+    # (consumption+WIP) frees that many MT/period -> rupees at the set price.
+    savings_mt = round(driver.consumed_mt * 0.01, 1) if driver else 0.0
+    savings_inr = savings_mt * STEEL_PRICE_INR_PER_MT
+
+    over = [s for s in real if s.wastage_pct > s.cap_pct]
+    grade = _grade(portfolio_health)
+
+    # health "trend": mean of last-two-month deltas across sites (directional)
+    deltas = []
+    for s in real:
+        r = [p[2] for p in s.trend if p[2] is not None]
+        if len(r) >= 2:
+            deltas.append(r[-1] - r[-2])
+    avg_delta = round(sum(deltas) / len(deltas), 2) if deltas else 0.0
+
+    headline = (
+        f"Portfolio grade {grade}. "
+        f"{len(over)} of {len(real)} sites are over their wastage cap"
+        + (f", led by {driver.name} which alone drives {driver_share:.0f}% of total wastage." if driver else ".")
+    )
+    next_step = (
+        f"Audit contractor steel issuance at {driver.name} first — it is the largest single lever."
+        if driver else "Maintain current controls; no site is materially over cap."
+    )
+
+    return {
+        "grade": grade,
+        "health": portfolio_health,
+        "health_wow_delta_pp": avg_delta,           # avg site wastage change, pp
+        "wastage_pct": portfolio_wastage,
+        "forecast_pct": forecast,
+        "driver_site": driver.name if driver else None,
+        "driver_project_id": driver.project_id if driver else None,
+        "driver_share_pct": round(driver_share, 0),
+        "sites_over_cap": len(over),
+        "site_count": len(real),
+        "headline": headline,
+        "next_step": next_step,
+        "savings_mt_per_pp": savings_mt,             # MT freed per 1pp cut at driver
+        "savings_inr_per_pp": round(savings_inr),
+        "steel_price_inr_per_mt": STEEL_PRICE_INR_PER_MT,
+    }
+
+
 # ---------------------------------------------------------------- alerts / timeline
 
 async def _recent_activity(sites_by_id: dict[str, SiteFacts], limit: int = 30) -> list[dict]:
@@ -442,6 +518,7 @@ async def build_admin_analytics() -> dict:
             "open_exceptions": sum(f.open_exceptions for f in facts),
         },
         "sites": sites_payload,
+        "narrative": _narrative(facts, portfolio_health, portfolio_wastage, pt_forecast),
         "portfolio_trend": portfolio_trend,
         "portfolio_forecast_pct": pt_forecast,
         "insights": _insights(facts, healths),

@@ -19,11 +19,13 @@ export function ScatterChart({
   capPct = 3,
   height = 300,
   onOpen,
+  activeId,
 }: {
   sites: AnalyticsSite[]
   capPct?: number
   height?: number
   onOpen?: (s: AnalyticsSite) => void
+  activeId?: string | null
 }) {
   const [hover, setHover] = useState<string | null>(null)
   const pts = sites.filter((s) => s.wastage_pct != null)
@@ -77,14 +79,18 @@ export function ScatterChart({
             onMouseLeave={() => setHover(null)}
             onClick={() => onOpen?.(s)}
           >
+            {activeId === s.project_id && (
+              <circle cx={x(s.received_mt)} cy={y(s.wastage_pct ?? 0)} r={r(s.open_exceptions) + 4} fill="none" stroke={RISK_COLOR[s.risk]} strokeWidth={1} opacity={0.4} />
+            )}
             <circle
               cx={x(s.received_mt)}
               cy={y(s.wastage_pct ?? 0)}
               r={r(s.open_exceptions)}
               fill={RISK_COLOR[s.risk]}
-              fillOpacity={hover === s.project_id ? 0.55 : 0.32}
+              fillOpacity={activeId && activeId !== s.project_id ? 0.1 : hover === s.project_id || activeId === s.project_id ? 0.6 : 0.32}
               stroke={RISK_COLOR[s.risk]}
-              strokeWidth={1.5}
+              strokeWidth={activeId === s.project_id ? 2.5 : 1.5}
+              strokeOpacity={activeId && activeId !== s.project_id ? 0.3 : 1}
             />
             {hover === s.project_id && (
               <text x={x(s.received_mt)} y={y(s.wastage_pct ?? 0) - r(s.open_exceptions) - 4} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">

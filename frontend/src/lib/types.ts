@@ -376,6 +376,24 @@ export interface AnalyticsSite {
   trend: AnalyticsTrendPoint[]
 }
 
+export interface AnalyticsNarrative {
+  grade: string
+  health: number
+  health_wow_delta_pp: number
+  wastage_pct: number | null
+  forecast_pct: number | null
+  driver_site: string | null
+  driver_project_id: string | null
+  driver_share_pct: number
+  sites_over_cap: number
+  site_count: number
+  headline: string
+  next_step: string
+  savings_mt_per_pp: number
+  savings_inr_per_pp: number
+  steel_price_inr_per_mt: number
+}
+
 export interface AnalyticsInsight {
   severity: "info" | "warning" | "critical"
   title: string
@@ -421,6 +439,7 @@ export interface AdminAnalytics {
     open_exceptions: number
   }
   sites: AnalyticsSite[]
+  narrative: AnalyticsNarrative
   portfolio_trend: { year: number; month: number; wastage_pct: number; moving_avg: number | null }[]
   portfolio_forecast_pct: number | null
   insights: AnalyticsInsight[]
