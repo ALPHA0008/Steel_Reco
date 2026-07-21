@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Lock, RotateCcw } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Page, PageHeader } from "@/components/app/page"
@@ -7,11 +7,26 @@ import { Banner } from "@/components/app/banner"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useAbstract, useFinalizeMonth, useMyProject, useReopenMonth } from "@/lib/queries"
-import { apiErrorMessage } from "@/lib/api"
+import { useAbstract, useFinalizeMonth, useMyProject, usePeriodBounds, useReopenMonth } from "@/lib/queries"
+import { apiErrorMessage, downloadAbstractXlsx } from "@/lib/api"
 import type { AbstractResponse } from "@/lib/types"
 
 /**
@@ -95,7 +110,7 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
     {
       code: "M",
       label: "Wastage %",
-      formula: "M = K / G (as defined in the legacy sheet — flagged for confirmation)",
+      formula: "M = L / G (corrected 2026-07-16, verified against the real business formula)",
       computed: true,
       values: {},
       scalar: m == null ? "—" : `${m.toFixed(2)}%`,
@@ -112,6 +127,11 @@ function fmt(kg: number | undefined, unit: "kg" | "mt"): string {
   return v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** month index (year*12+month) for easy comparison/clamping */
+function periodIndex(year: number, month: number): number {
+  return year * 12 + (month - 1)
+}
+
 export function AbstractPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
@@ -119,12 +139,41 @@ export function AbstractPage() {
   const [unit, setUnit] = useState<"kg" | "mt">("mt")
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [reopenOpen, setReopenOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerYear, setPickerYear] = useState(year)
+  const [pickerMonth, setPickerMonth] = useState(month)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const didInitFromBounds = useRef(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      await downloadAbstractXlsx(year, month)
+    } catch (err) {
+      toast.error(apiErrorMessage(err, "Could not export the Abstract."))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const project = useMyProject()
+  const bounds = usePeriodBounds()
   const abstract = useAbstract(year, month)
   const finalize = useFinalizeMonth()
   const reopen = useReopenMonth()
+
+  // Default to the latest month with real activity, not today's calendar
+  // date -- opening the Abstract fresh should land you on data, not on
+  // whatever month it happens to be in the real world. Runs once, the first
+  // time bounds arrive; never overrides a period the user has navigated to.
+  useEffect(() => {
+    if (didInitFromBounds.current) return
+    if (bounds.data?.latest_year == null || bounds.data?.latest_month == null) return
+    didInitFromBounds.current = true
+    setYear(bounds.data.latest_year)
+    setMonth(bounds.data.latest_month)
+  }, [bounds.data])
 
   const capPct = project.data ? parseFloat(project.data.contract_wastage_pct) : 3.0
   const built = useMemo(
@@ -132,11 +181,52 @@ export function AbstractPage() {
     [abstract.data, capPct],
   )
 
+  const latestIdx =
+    bounds.data?.latest_year != null && bounds.data?.latest_month != null
+      ? periodIndex(bounds.data.latest_year, bounds.data.latest_month)
+      : null
+  const earliestIdx =
+    bounds.data?.earliest_year != null && bounds.data?.earliest_month != null
+      ? periodIndex(bounds.data.earliest_year, bounds.data.earliest_month)
+      : null
+  const currentIdx = periodIndex(year, month)
+  const atLatest = latestIdx != null && currentIdx >= latestIdx
+  const atEarliest = earliestIdx != null && currentIdx <= earliestIdx
+
   function shiftMonth(delta: number) {
     const d = new Date(year, month - 1 + delta, 1)
+    const nextIdx = periodIndex(d.getFullYear(), d.getMonth() + 1)
+    if (latestIdx != null && nextIdx > latestIdx) return
+    if (earliestIdx != null && nextIdx < earliestIdx) return
     setYear(d.getFullYear())
     setMonth(d.getMonth() + 1)
   }
+
+  function openPicker() {
+    setPickerYear(year)
+    setPickerMonth(month)
+    setPickerOpen(true)
+  }
+
+  function applyPicker() {
+    setYear(pickerYear)
+    setMonth(pickerMonth)
+    setPickerOpen(false)
+  }
+
+  const yearOptions =
+    bounds.data?.earliest_year != null && bounds.data?.latest_year != null
+      ? Array.from(
+          { length: bounds.data.latest_year - bounds.data.earliest_year + 1 },
+          (_, i) => bounds.data!.earliest_year! + i,
+        )
+      : [year]
+
+  const monthOptionsForPickerYear = MONTH_NAMES.map((name, i) => {
+    const idx = periodIndex(pickerYear, i + 1)
+    const inBounds = (earliestIdx == null || idx >= earliestIdx) && (latestIdx == null || idx <= latestIdx)
+    return { value: i + 1, name, disabled: !inBounds }
+  })
 
   const periodLabel = `${MONTH_NAMES[month - 1]} ${year}`
   const scrapKg = abstract.data ? parseFloat(abstract.data.section_n_scrap_sold_kg) : 0
@@ -149,11 +239,30 @@ export function AbstractPage() {
         actions={
           <>
             <div className="flex items-center rounded-lg border">
-              <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Previous month"
+                disabled={atEarliest}
+                onClick={() => shiftMonth(-1)}
+              >
                 <ChevronLeft />
               </Button>
-              <span className="tnum min-w-32 px-1 text-center text-[13px] font-semibold">{periodLabel}</span>
-              <Button variant="ghost" size="icon" aria-label="Next month" onClick={() => shiftMonth(1)}>
+              <button
+                type="button"
+                onClick={openPicker}
+                className="tnum min-w-32 cursor-pointer rounded-md px-1 text-center text-[13px] font-semibold hover:bg-muted"
+                title="Jump to a month"
+              >
+                {periodLabel}
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Next month"
+                disabled={atLatest}
+                onClick={() => shiftMonth(1)}
+              >
                 <ChevronRight />
               </Button>
             </div>
@@ -163,6 +272,9 @@ export function AbstractPage() {
                 <TabsTrigger value="kg">KG</TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button variant="outline" disabled={exporting} onClick={handleExport}>
+              <Download /> {exporting ? "Exporting…" : "Export"}
+            </Button>
             <Button variant="outline" onClick={() => setReopenOpen(true)}>
               <RotateCcw /> Reopen
             </Button>
@@ -291,6 +403,61 @@ export function AbstractPage() {
           {abstract.data && <span className="tnum">{abstract.data.pipeline_version}</span>}
         </div>
       </Card>
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Jump to a month</DialogTitle>
+            <DialogDescription>
+              Only months with real ledger activity for this project can be viewed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              value={String(pickerMonth)}
+              onValueChange={(v) => setPickerMonth(parseInt(v, 10))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptionsForPickerYear.map((m) => (
+                  <SelectItem key={m.value} value={String(m.value)} disabled={m.disabled}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={String(pickerYear)}
+              onValueChange={(v) => setPickerYear(parseInt(v, 10))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-brand text-brand-foreground hover:bg-brand-hover"
+              disabled={monthOptionsForPickerYear.find((m) => m.value === pickerMonth)?.disabled}
+              onClick={applyPicker}
+            >
+              Go
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={finalizeOpen}

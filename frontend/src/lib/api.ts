@@ -167,6 +167,56 @@ export async function reactivateAdminUser(userId: string): Promise<AdminUser> {
   return res.data
 }
 
+// ---- Admin multi-site dashboard ----
+
+export async function fetchAdminSites(): Promise<import("./types").AdminSiteSummary[]> {
+  const res = await api.get<import("./types").AdminSiteSummary[]>("/admin/sites")
+  return res.data
+}
+
+export async function fetchAdminMasterSummary(): Promise<import("./types").AdminMasterSummary> {
+  const res = await api.get<import("./types").AdminMasterSummary>("/admin/master-summary")
+  return res.data
+}
+
+export async function fetchAdminSiteSummary(
+  projectId: string,
+): Promise<import("./types").DashboardSummary> {
+  const res = await api.get<import("./types").DashboardSummary>(`/admin/sites/${projectId}/dashboard-summary`)
+  return res.data
+}
+
+export async function fetchAdminSiteWastageTrend(
+  projectId: string,
+): Promise<import("./types").WastageTrendResponse> {
+  const res = await api.get<import("./types").WastageTrendResponse>(`/admin/sites/${projectId}/wastage-trend`)
+  return res.data
+}
+
+// ---- Abstract export ----
+
+/** Downloads the Abstract as an .xlsx in the A-N x diameter layout the QS
+ * already knows, and triggers the browser's save dialog -- same figures as
+ * the on-screen Abstract, generated from the ledger, never typed. */
+export async function downloadAbstractXlsx(year: number, month: number): Promise<void> {
+  const res = await api.get(`/abstract/export`, {
+    params: { year, month },
+    responseType: "blob",
+  })
+  const disposition = res.headers["content-disposition"] as string | undefined
+  const match = disposition?.match(/filename="?([^"]+)"?/)
+  const filename = match?.[1] ?? `Steel_Abstract_${year}-${String(month).padStart(2, "0")}.xlsx`
+
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export async function setProjectSignupCode(projectId: string, code?: string): Promise<{ signup_code: string }> {
   const res = await api.post<{ project_id: string; signup_code: string }>(
     `/admin/projects/${projectId}/signup-code`,

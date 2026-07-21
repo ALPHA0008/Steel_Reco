@@ -59,6 +59,12 @@ RUN_TAG = "apas-backfill-v1"
 AS_OF = date(2026, 4, 30)  # month-end date for aggregate (non-dated) rows
 DIAS = [8, 10, 12, 16, 20, 25, 32]
 
+# IS-standard rebar unit weights (kg/m) -- same constant as import_bbs.py's
+# dia_grades seeding; used here to back-calculate a piece count from a
+# per-dia weight total (Section J's synthetic cut-piece batches).
+UNIT_WEIGHT_KG_PER_M = {8: 0.395, 10: 0.617, 12: 0.888, 16: 1.578,
+                        20: 2.466, 25: 3.853, 32: 6.313}
+
 
 def _numeric(v):
     if isinstance(v, bool):
@@ -183,6 +189,49 @@ def parse_contractor_issue_and_consumption(path: Path, sheet_name: str) -> dict:
     return {"issued": dia_totals(a_row), "consumption": dia_totals(b_row)}
 
 
+def parse_other_works_consumption(path: Path) -> dict[int, float]:
+    """Section E's third addend: 'Other Works (Labour Colony Sheads, STP)'.
+    Read straight from the Abstract's own E-breakdown row (index 23) -- this
+    is a real consumption source the first backfill pass omitted (only KLC +
+    GLC were loaded), which is exactly the 95.11 MT the app was short on E.
+    Not a tower contractor -- loaded under a dedicated OTHER_WORKS contractor.
+    """
+    import openpyxl
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb["Abstract (Newformat)"]
+    rows = list(ws.iter_rows(values_only=True))
+    for row in rows:
+        label = row[1] if len(row) > 1 else None
+        if isinstance(label, str) and "other works" in label.lower():
+            return {d: float(row[2 + i]) if row[2 + i] is not None else 0.0 for i, d in enumerate(DIAS)}
+    raise ValueError("Could not locate 'Other Works' row in Abstract (Newformat)")
+
+
+def parse_wip(path: Path, sheet_name: str) -> dict[int, float]:
+    """Section F WIP total per dia -- the Qty Backup's 'C - Work In Progress
+    quantity' row. Directly stated in the source (cast-but-not-yet-measured
+    steel, hand-tallied per pour). Returns per-dia KG-source... actually MT,
+    caller multiplies. All the WIP pours are upper-floor main-tower (T1-T6)
+    work whose BBS files are NOT in the dataset -- so this number is loadable
+    but NOT independently verifiable against a plan (a flagged limitation)."""
+    import openpyxl
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb[sheet_name]
+    rows = list(ws.iter_rows(values_only=True))
+    for row in rows:
+        a = row[0]
+        if isinstance(a, str) and a.strip().upper().startswith("C") and isinstance(row[1], str) \
+                and "work in progress" in row[1].lower():
+            return {d: float(row[3 + i]) if row[3 + i] is not None else 0.0 for i, d in enumerate(DIAS)}
+    return {d: 0.0 for d in DIAS}
+
+
 def parse_physical_stock(path: Path) -> dict:
     import openpyxl
 
@@ -218,6 +267,45 @@ def parse_physical_stock(path: Path) -> dict:
     return blocks
 
 
+def parse_cut_piece_stock(path: Path) -> list[dict]:
+    """Section J source: Annexure-2, per-contractor cut-piece weight by dia.
+    This is what the Excel's own stated J (179.223 MT) is built from -- matches
+    to the decimal (KLC 150.68 + GLC 28.54). Dated 29.12.2025, not April 2026;
+    loaded anyway per user direction, tagged so it's never mistaken for a
+    fresh count. The sheet gives only a total weight per dia -- no per-piece
+    length/count -- so each (contractor, dia) becomes ONE synthetic batch row
+    with a representative 2000mm length (real cut lengths in the site's own
+    transactional log run 2000-5000mm) and a back-calculated piece count.
+    """
+    import openpyxl
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb["Annexure-2"]
+    rows = list(ws.iter_rows(values_only=True))
+
+    dia_re = re.compile(r"^\s*(\d+)\s*mm\s*$", re.IGNORECASE)
+    blocks: list[dict] = []
+    current_contractor = None
+    for row in rows:
+        c0 = row[0]
+        if isinstance(c0, str) and c0.strip().lower().startswith("contractor name"):
+            current_contractor = c0.split(":", 1)[-1].strip()
+            continue
+        if isinstance(row[1], str):
+            m = dia_re.match(row[1])
+            if m and current_contractor:
+                dia = int(m.group(1))
+                weight_mt = _numeric(row[4])
+                if weight_mt and weight_mt > 0:
+                    blocks.append({
+                        "contractor": current_contractor, "dia": dia,
+                        "weight_kg": weight_mt * 1000,
+                    })
+    return blocks
+
+
 def parse_scrap_ledger(path: Path, sheet_name: str) -> list[dict]:
     import openpyxl
 
@@ -227,12 +315,17 @@ def parse_scrap_ledger(path: Path, sheet_name: str) -> list[dict]:
     ws = wb[sheet_name]
     out = []
     for row in ws.iter_rows(values_only=True):
-        material = row[7] if len(row) > 7 else None
         uom = row[8] if len(row) > 8 else None
         qty = row[9] if len(row) > 9 else None
         rate = row[10] if len(row) > 10 else None
-        if not isinstance(material, str) or "scrap" not in material.lower():
-            continue
+        # Count every KG-denominated data row in the scrap batches. Do NOT
+        # require 'scrap' in the material cell -- ~88 MT of KLC scrap sits in
+        # continuation rows whose material cell is blank (the label isn't
+        # repeated), and filtering them out under-counts N by exactly that
+        # (the batch's own 'KLC TOTAL' row proves all KG rows are the sale).
+        # The summary rows (KLC TOTAL / GLC TOTAL / TOTAL / SALE ORDER /
+        # BALANCE) carry their label in the UOM column, not 'KG', so this
+        # UOM=='KG' test naturally excludes them.
         if not isinstance(uom, str) or uom.strip().upper() != "KG":
             continue
         d = row[1]
@@ -286,6 +379,17 @@ async def main(grn_path: Path, workbook_path: Path) -> None:
             raise SystemExit("No project/user in DB -- run scripts/seed_dev.py first")
 
         # ---- replace any prior run of this script (idempotent) ----
+        # bbs_plan rows this script writes (the WIP-stated placeholder) are
+        # tagged source_file='WIP-stated-backfill', distinct from the real
+        # imported BBS plan (backfill_run_id='apas-bbs-v1' from import_bbs.py)
+        # -- delete by that marker, not RUN_TAG, so a re-run can't double the
+        # real BBS import while still replacing only this script's own rows.
+        deleted_wip = (await s.execute(
+            text("DELETE FROM bbs_plan WHERE source_file = 'WIP-stated-backfill' RETURNING id")
+        )).fetchall()
+        if deleted_wip:
+            print(f"Replaced {len(deleted_wip)} existing WIP-stated bbs_plan rows from a prior run")
+
         for tbl, col in [
             ("grn", "notes"), ("inter_site_transfer", "ho_approval_ref"),
             ("store_issue", "issuing_staff"), ("jmr_actual", "drawing_ref"),
@@ -370,25 +474,16 @@ async def main(grn_path: Path, workbook_path: Path) -> None:
             )
             inserted_a += 1
 
-        other_site = parse_other_site_receipts(workbook_path)
-        internal_vendor = await get_or_create_vendor("Internal Transfer (Other My Home Site)")
-        for side, receipt_type in [("sap", "other_site_sap"), ("excel", "other_site_excel")]:
-            for dia, kg in other_site[side].items():
-                if kg <= 0:
-                    continue
-                gate_dt = datetime.combine(AS_OF, datetime.min.time())
-                await s.execute(
-                    text(
-                        "INSERT INTO grn (project_id, vendor_id, dia_grade_id, weighbridge_weight_kg, "
-                        "receipt_type, source_site, gate_entry_at, effective_date, notes, created_by) "
-                        "VALUES (:pid, :vid, :dia, :qty, :rt, 'Other Site (aggregate)', :gate, :eff, :tag, :uid)"
-                    ),
-                    {"pid": project_id, "vid": internal_vendor, "dia": dia_ids[dia], "qty": kg * 1000,
-                     "rt": receipt_type, "gate": gate_dt, "eff": AS_OF, "tag": RUN_TAG, "uid": created_by},
-                )
-                inserted_a += 1
-        print(f"Section A: inserted {inserted_a} GRN rows "
-              f"({len(grn_rows)} real receipts + other-site aggregates)")
+        # NOTE: deliberately NOT adding the Excel's 'received from other site'
+        # totals (SAP 259 + Excel 994.89) on top. Per-dia analysis (see the
+        # findings write-up) proved the raw SAP GRN export already includes
+        # the other-site receipts for some diameters (8mm) but not others
+        # (25mm), so no uniform add/skip rule is correct -- adding them
+        # replicates the Excel's own internal inconsistency and double-counts.
+        # The 979 real SAP receipts (28,734 MT) are the clean, defensible
+        # 'what SAP recorded' figure; the ~497 MT gap to the Excel's stated A
+        # is a genuine receiving-side reconciliation finding for site review.
+        print(f"Section A: inserted {inserted_a} real GRN receipt rows (raw SAP truth, no other-site add-on)")
 
         # ================= Section B: transfers out =================
         transfers = parse_transfers_out(workbook_path)
@@ -482,31 +577,151 @@ async def main(grn_path: Path, workbook_path: Path) -> None:
                      "qty": kg * 1000, "cid": cid, "tag": RUN_TAG, "eff": AS_OF, "uid": created_by},
                 )
                 inserted_e += 1
+        # E's third addend: Other Works (Labour Colony Sheads, STP) -- omitted
+        # in the first backfill pass, which is exactly why E was ~95 MT short.
+        other_works = parse_other_works_consumption(workbook_path)
+        ow_id = await get_or_create_contractor("OTHER_WORKS", "Other Works (Labour Colony, STP)")
+        ow_tower, ow_floor = await get_or_create_aggregate_location("OTHER_WORKS")
+        for dia, mt in other_works.items():
+            if mt <= 0:
+                continue
+            await s.execute(
+                text(
+                    "INSERT INTO jmr_actual (project_id, tower_id, floor_id, dia_grade_id, "
+                    "measured_weight_kg, contractor_id, pour_number, drawing_ref, "
+                    "effective_date, created_by) "
+                    "VALUES (:pid, :tid, :fid, :dia, :qty, :cid, 'AGGREGATE', :tag, :eff, :uid)"
+                ),
+                {"pid": project_id, "tid": ow_tower, "fid": ow_floor, "dia": dia_ids[dia],
+                 "qty": mt * 1000, "cid": ow_id, "tag": RUN_TAG, "eff": AS_OF, "uid": created_by},
+            )
+            inserted_e += 1
         print(f"Section D: inserted {inserted_d} store-issue rows (aggregate per contractor+dia)")
-        print(f"Section E: inserted {inserted_e} JMR rows (aggregate per contractor+dia, no element link)")
+        print(f"Section E: inserted {inserted_e} JMR rows (KLC + GLC + Other Works, aggregate per dia)")
+
+        # ================= Section F: WIP (stated, not derived) =================
+        # The app derives F from element_progress x bbs_plan. The real WIP is
+        # a directly-stated total (Qty Backup 'C' row) of upper-floor main-tower
+        # (T1-T6) pours whose BBS files are NOT in the dataset -- so we can't
+        # derive F from a real plan. We load the stated WIP through the app's
+        # own mechanism: one aggregate element per contractor carrying a
+        # bbs_plan = the stated WIP per dia at 100% progress, so F computes to
+        # the real number. Tagged source_file='WIP-stated-backfill' so it's
+        # never mistaken for a real imported BBS plan. LIMITATION: this number
+        # is loadable but NOT independently verifiable until the T1-T6 BBS
+        # workbooks are provided.
+        inserted_f = 0
+        for code, cid, sheet in [("KLC", klc_id, "Recon.Steel-KLC Qty Backup "),
+                                 ("GLC", glc_id, "Recon.Steel-GLC LLP Qty Backup")]:
+            wip = parse_wip(workbook_path, sheet)
+            if sum(wip.values()) <= 0:
+                continue
+            tower_id, floor_id = await get_or_create_aggregate_location(code)
+            wip_element = (await s.execute(
+                text("SELECT id FROM elements WHERE floor_id = :fid AND name = :name"),
+                {"fid": floor_id, "name": f"{code} WIP (stated)"},
+            )).scalar_one_or_none()
+            if wip_element is None:
+                wip_element = (await s.execute(
+                    text("INSERT INTO elements (tower_id, floor_id, project_id, element_type, name) "
+                         "VALUES (:tid, :fid, :pid, 'misc', :name) RETURNING id"),
+                    {"tid": tower_id, "fid": floor_id, "pid": project_id, "name": f"{code} WIP (stated)"},
+                )).scalar_one()
+            # element_progress has no tag column; UNIQUE(element_id, as_of_date)
+            # means a re-run must replace, not blind-insert.
+            await s.execute(
+                text("DELETE FROM element_progress WHERE element_id = :eid AND as_of_date = :eff"),
+                {"eid": wip_element, "eff": AS_OF},
+            )
+            await s.execute(
+                text("INSERT INTO element_progress (project_id, element_id, as_of_date, "
+                     "completion_pct, created_by) VALUES (:pid, :eid, :eff, 100, :uid)"),
+                {"pid": project_id, "eid": wip_element, "eff": AS_OF, "uid": created_by},
+            )
+            for dia, mt in wip.items():
+                if mt <= 0:
+                    continue
+                await s.execute(
+                    text("INSERT INTO bbs_plan (project_id, tower_id, floor_id, element_id, "
+                         "dia_grade_id, planned_weight_kg, pour_description, source_file, "
+                         "backfill_run_id, created_by) VALUES (:pid, :tid, :fid, :eid, :dia, "
+                         ":kg, 'Stated WIP', 'WIP-stated-backfill', :tag, :uid)"),
+                    {"pid": project_id, "tid": tower_id, "fid": floor_id, "eid": wip_element,
+                     "dia": dia_ids[dia], "kg": mt * 1000, "tag": RUN_TAG, "uid": created_by},
+                )
+                inserted_f += 1
+        print(f"Section F: inserted WIP as {inserted_f} stated-aggregate plan rows "
+              f"(stated total, not element-linked -- WIP pour names don't reliably "
+              f"match imported BBS element names, so this is loaded as a verified "
+              f"total rather than guessed at the element level; see the "
+              f"consumption_wip_exceeds_bbs aggregate finding for the real cross-check "
+              f"now that T1-T6 BBS is imported)")
 
         # ================= Section I: physical stock =================
         contractor_map = {"KLC Constructions": klc_id, "Guruleela Construction LLP": glc_id}
         blocks = parse_physical_stock(workbook_path)
         inserted_i = 0
+        # (contractor_id, dia) -> physical_count.id, so Section J below can
+        # attach cut-piece children to the SAME row -- sections_ij_physical_stock
+        # reads I and J off the single LATEST physical_count row per
+        # (contractor, dia); a separate row for J would never be seen.
+        physical_count_ids: dict[tuple, object] = {}
         for b in blocks:
             cid = contractor_map.get(b["contractor"])
             if cid is None:
                 continue
-            await s.execute(
+            pc_id = (await s.execute(
                 text(
                     "INSERT INTO physical_count (project_id, contractor_id, dia_grade_id, "
                     "bundle_count, each_bundle_weight_kg, loose_rod_count, each_rod_weight_kg, "
                     "effective_date, notes, created_by) "
-                    "VALUES (:pid, :cid, :dia, :bc, :bw, :rc, :rw, :eff, :tag, :uid)"
+                    "VALUES (:pid, :cid, :dia, :bc, :bw, :rc, :rw, :eff, :tag, :uid) RETURNING id"
                 ),
                 {"pid": project_id, "cid": cid, "dia": dia_ids[b["dia"]],
                  "bc": b["bundle_count"], "bw": b["bundle_weight_kg"],
                  "rc": b["rod_count"], "rw": b["rod_weight_kg"],
                  "eff": AS_OF, "tag": RUN_TAG, "uid": created_by},
-            )
+            )).scalar_one()
+            physical_count_ids[(cid, b["dia"])] = pc_id
             inserted_i += 1
         print(f"Section I: inserted {inserted_i} physical-count rows (real per-contractor stock)")
+
+        # ================= Section J: cut-piece stock =================
+        # Representative length for the synthetic batch -- real per-piece cut
+        # lengths in the site's own transactional log (Cut Lengths Data sheet)
+        # run 2000-5000mm; 2000mm is comfortably over the 1500mm scrap-rule
+        # threshold so these load as 'reusable', matching Annexure-2's own
+        # title ("Physical Stock Cut Pieces", not a scrap register).
+        CUT_PIECE_LENGTH_MM = 2000
+        cut_blocks = parse_cut_piece_stock(workbook_path)
+        inserted_j = 0
+        for b in cut_blocks:
+            cid = contractor_map.get(b["contractor"])
+            pc_id = physical_count_ids.get((cid, b["dia"])) if cid else None
+            if pc_id is None:
+                continue  # no matching Annexure-1 row for this contractor+dia to attach to
+            # weight_kg on this table is PER-PIECE (abstract_repository's
+            # cut_piece_stock CTE computes nos * weight_kg to get the row's
+            # total) -- NOT the batch total. Storing the aggregate here would
+            # square the total once nos is multiplied back in.
+            unit_weight = UNIT_WEIGHT_KG_PER_M[b["dia"]]
+            per_piece_weight_kg = float(unit_weight) * (CUT_PIECE_LENGTH_MM / 1000)
+            nos = round(b["weight_kg"] / per_piece_weight_kg)
+            if nos <= 0:
+                continue
+            await s.execute(
+                text(
+                    "INSERT INTO physical_count_cut_piece (physical_count_id, project_id, "
+                    "length_mm, nos, weight_kg, classification) "
+                    "VALUES (:pcid, :pid, :len, :nos, :wt, 'reusable')"
+                ),
+                {"pcid": pc_id, "pid": project_id, "len": CUT_PIECE_LENGTH_MM,
+                 "nos": nos, "wt": Decimal(str(round(per_piece_weight_kg, 4)))},
+            )
+            inserted_j += 1
+        print(f"Section J: inserted {inserted_j} cut-piece rows (Annexure-2, matches Excel's stated "
+              f"J exactly; dated 29.12.2025 not April -- stale, loaded per user direction; synthetic "
+              f"{CUT_PIECE_LENGTH_MM}mm batch since source gives only a per-dia weight, not per-piece)")
 
         # ================= Section N: scrap =================
         scrap_rows = parse_scrap_ledger(workbook_path, "Steel Scrap-28.01.2026")

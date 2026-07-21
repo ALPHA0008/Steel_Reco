@@ -189,12 +189,29 @@ async def test_consumption_wip_exceeds_bbs_finding(
 async def test_wastage_over_cap_and_scrap_exceeds_generated_findings(
     app_client, seeded_project, auth_headers, superuser_session
 ):
-    """E=100 consumed, K=10 physical -> M = 10/100 = 10% > the 3% cap.
+    """C=105 received, E=100 consumed -> H=5 theoretical stock; K=1 physical
+    (most of it missing) -> L=4, M = L/G = 4/100 = 4% > the 3% cap.
     Scrap sold 500kg with nothing plausibly generated -> leakage finding."""
     project_id = seeded_project["project"].id
     tower_id, floor_id, element_id, dia_id, contractor_id = await _seed(
         superuser_session, project_id
     )
+
+    vendor_id = (
+        await superuser_session.execute(
+            text("INSERT INTO vendors (name) VALUES (:n) RETURNING id"), {"n": f"V-{uuid.uuid4().hex[:8]}"}
+        )
+    ).scalar_one()
+    user_id = (await superuser_session.execute(text("SELECT id FROM users LIMIT 1"))).scalar_one()
+    await superuser_session.execute(
+        text(
+            "INSERT INTO grn (project_id, vendor_id, dia_grade_id, weighbridge_weight_kg, receipt_type, "
+            "gate_entry_at, effective_date, created_by) "
+            "VALUES (:pid, :vid, :dia, 105, 'against_po', '2026-06-10T09:00:00Z', '2026-06-10', :uid)"
+        ),
+        {"pid": project_id, "vid": vendor_id, "dia": dia_id, "uid": user_id},
+    )
+    await superuser_session.commit()
 
     await app_client.post(
         "/api/v1/jmr-actuals",
@@ -215,7 +232,7 @@ async def test_wastage_over_cap_and_scrap_exceeds_generated_findings(
             "contractor_id": str(contractor_id),
             "dia_grade_id": str(dia_id),
             "bundle_count": 1,
-            "each_bundle_weight_kg": "10",
+            "each_bundle_weight_kg": "1",
             "effective_date": "2026-06-20",
         },
     )

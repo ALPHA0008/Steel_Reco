@@ -20,5 +20,7 @@ async def create_transfer(
 ) -> InterSiteTransferResponse:
     user_id, _role = current_user
     service = InterSiteTransferService(session, project_id, user_id)
-    transfer = await service.create(payload)
-    return InterSiteTransferResponse.model_validate(transfer)
+    transfer, warning = await service.create(payload)
+    resp = InterSiteTransferResponse.model_validate(transfer)
+    resp.warning = warning
+    return resp

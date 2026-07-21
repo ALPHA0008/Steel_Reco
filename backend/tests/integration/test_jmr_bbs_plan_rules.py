@@ -332,3 +332,101 @@ async def test_tolerance_pct_override_from_rule_thresholds_is_honored(
     )
     assert resp.status_code == 201
     assert resp.json()["warning"] is None
+
+
+@pytest.mark.asyncio
+async def test_correction_of_row_in_finalized_month_is_blocked(
+    app_client, seeded_project, auth_headers, superuser_session
+):
+    """The locked-month check must apply to the ORIGINAL row's period, not just
+    the correction's own date. Superseding is retroactive: a correction dated
+    into an open month would otherwise rewrite an already-finalized Abstract
+    without Reopen -- the manipulation shape this guard exists for."""
+    project_id = seeded_project["project"].id
+    tower_id, floor_id, element_id, dia_id = await _seed_structure_and_plan(
+        superuser_session, project_id, planned_weight_kg="1000"
+    )
+
+    # Original lands in 2025-11; finalize that month; then try to "correct"
+    # it with an entry dated into a later, open month.
+    original = await app_client.post(
+        "/api/v1/jmr-actuals",
+        headers=auth_headers,
+        json=_jmr_payload(tower_id, floor_id, element_id, dia_id, "100", date="2025-11-10"),
+    )
+    assert original.status_code == 201
+    original_id = original.json()["id"]
+
+    finalized = await app_client.post(
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2025, "month": 11}
+    )
+    assert finalized.status_code == 201
+
+    sneak = await app_client.post(
+        "/api/v1/jmr-actuals",
+        headers=auth_headers,
+        json=_jmr_payload(
+            tower_id, floor_id, element_id, dia_id, "1", date="2026-06-16",
+            corrected_from_id=original_id,
+        ),
+    )
+    assert sneak.status_code == 409
+    assert sneak.json()["error"]["code"] == "month_locked"
+
+    # And the original must still be active (not superseded) -- E still counts it.
+    abstract = await app_client.get(
+        "/api/v1/abstract", headers=auth_headers, params={"year": 2025, "month": 11}
+    )
+    e_rows = abstract.json()["section_e_consumption"]
+    dia_12_total = sum(float(r["consumption_kg"]) for r in e_rows if float(r["dia"]) == 12.0)
+    assert dia_12_total == 100.0
+
+
+@pytest.mark.asyncio
+async def test_correction_changing_scope_is_rejected_422(
+    app_client, seeded_project, auth_headers, superuser_session
+):
+    """A correction re-states the measurement, never WHAT was measured --
+    changing element/dia under a correction label would vanish one entry and
+    substitute an unrelated one while looking like a routine fix."""
+    project_id = seeded_project["project"].id
+    tower_id, floor_id, element_id, dia_id = await _seed_structure_and_plan(
+        superuser_session, project_id, planned_weight_kg="1000"
+    )
+    # a second element in the same structure to try to smuggle the entry onto
+    other_element_id = (
+        await superuser_session.execute(
+            text(
+                "INSERT INTO elements (tower_id, floor_id, project_id, element_type, name) "
+                "VALUES (:tid, :fid, :pid, 'slab', :name) RETURNING id"
+            ),
+            {"tid": tower_id, "fid": floor_id, "pid": project_id, "name": f"Slab-scope-{uuid.uuid4().hex[:8]}"},
+        )
+    ).scalar_one()
+    await superuser_session.commit()
+
+    original = await app_client.post(
+        "/api/v1/jmr-actuals",
+        headers=auth_headers,
+        json=_jmr_payload(tower_id, floor_id, element_id, dia_id, "100"),
+    )
+    assert original.status_code == 201
+    original_id = original.json()["id"]
+
+    smuggle = await app_client.post(
+        "/api/v1/jmr-actuals",
+        headers=auth_headers,
+        json=_jmr_payload(
+            tower_id, floor_id, other_element_id, dia_id, "999", corrected_from_id=original_id
+        ),
+    )
+    assert smuggle.status_code == 422
+    assert smuggle.json()["error"]["code"] == "correction_scope_mismatch"
+
+    # Same-scope correction still works exactly as before.
+    legit = await app_client.post(
+        "/api/v1/jmr-actuals",
+        headers=auth_headers,
+        json=_jmr_payload(tower_id, floor_id, element_id, dia_id, "110", corrected_from_id=original_id),
+    )
+    assert legit.status_code == 201

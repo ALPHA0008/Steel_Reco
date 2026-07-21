@@ -2,8 +2,15 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.exceptions import AlreadyCorrected, BlockingRuleViolation, MonthLocked, NotFoundError, ProjectMismatch
-from app.services.month_close_service import AlreadyFinalized, NotFinalized
+from app.exceptions import (
+    AlreadyCorrected,
+    BlockingRuleViolation,
+    CorrectionScopeMismatch,
+    MonthLocked,
+    NotFoundError,
+    ProjectMismatch,
+)
+from app.services.month_close_service import AlreadyFinalized, FutureMonthFinalize, NotFinalized
 
 
 def _envelope(code: str, message: str, details: list | None = None) -> dict:
@@ -44,6 +51,13 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _already_corrected(request: Request, exc: AlreadyCorrected) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=_envelope("already_corrected", str(exc)))
 
+    @app.exception_handler(CorrectionScopeMismatch)
+    async def _correction_scope_mismatch(request: Request, exc: CorrectionScopeMismatch) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("correction_scope_mismatch", str(exc)),
+        )
+
     @app.exception_handler(AlreadyFinalized)
     async def _already_finalized(request: Request, exc: AlreadyFinalized) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=_envelope("already_finalized", str(exc)))
@@ -51,6 +65,13 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(NotFinalized)
     async def _not_finalized(request: Request, exc: NotFinalized) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content=_envelope("not_finalized", str(exc)))
+
+    @app.exception_handler(FutureMonthFinalize)
+    async def _future_month(request: Request, exc: FutureMonthFinalize) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("future_month_finalize", str(exc)),
+        )
 
     @app.exception_handler(IntegrityError)
     async def _integrity_error(request: Request, exc: IntegrityError) -> JSONResponse:

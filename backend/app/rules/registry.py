@@ -3,6 +3,7 @@ from app.rules.transactional.duplicate_pour_entry import DuplicatePourEntryRule
 from app.rules.transactional.inbound_reconciliation import InboundReconciliationRule
 from app.rules.transactional.issue_exceeds_stock import IssueExceedsStockRule
 from app.rules.transactional.jmr_exceeds_bbs_plan import JmrExceedsBbsPlanRule
+from app.rules.transactional.transfer_exceeds_stock import TransferExceedsStockRule
 
 
 def build_rules_engine() -> RulesEngine:
@@ -14,6 +15,7 @@ def build_rules_engine() -> RulesEngine:
     engine.register(InboundReconciliationRule())
     engine.register(JmrExceedsBbsPlanRule())
     engine.register(DuplicatePourEntryRule())
+    engine.register(TransferExceedsStockRule())
     return engine
 
 

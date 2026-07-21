@@ -35,13 +35,13 @@ async def _seed_masters(superuser_session):
 @pytest.mark.asyncio
 async def test_finalize_then_double_finalize_rejected(app_client, seeded_project, auth_headers):
     r1 = await app_client.post(
-        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 1}
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 1}
     )
     assert r1.status_code == 201
     snapshot_1 = r1.json()["snapshot_id"]
 
     r2 = await app_client.post(
-        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 1}
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 1}
     )
     assert r2.status_code == 409
     assert r2.json()["error"]["code"] == "already_finalized"
@@ -53,7 +53,7 @@ async def test_finalized_month_blocks_new_writes(app_client, seeded_project, aut
     vendor_id, dia_id = await _seed_masters(superuser_session)
 
     finalize_resp = await app_client.post(
-        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 2}
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 2}
     )
     assert finalize_resp.status_code == 201
 
@@ -63,7 +63,7 @@ async def test_finalized_month_blocks_new_writes(app_client, seeded_project, aut
         json={
             "vendor_id": str(vendor_id), "dia_grade_id": str(dia_id),
             "weighbridge_weight_kg": "100", "receipt_type": "against_po",
-            "gate_entry_at": "2027-02-15T09:00:00Z",
+            "gate_entry_at": "2022-02-15T09:00:00Z",
         },
     )
     assert grn_resp.status_code == 409
@@ -72,10 +72,10 @@ async def test_finalized_month_blocks_new_writes(app_client, seeded_project, aut
 
 @pytest.mark.asyncio
 async def test_reopen_requires_nonempty_reason(app_client, seeded_project, auth_headers):
-    await app_client.post("/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 3})
+    await app_client.post("/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 3})
 
     response = await app_client.post(
-        "/api/v1/month-close/reopen", headers=auth_headers, json={"year": 2027, "month": 3, "reason": ""}
+        "/api/v1/month-close/reopen", headers=auth_headers, json={"year": 2022, "month": 3, "reason": ""}
     )
     assert response.status_code == 422
 
@@ -89,7 +89,7 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
     vendor_id, dia_id = await _seed_masters(superuser_session)
 
     finalize_1 = await app_client.post(
-        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 4}
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 4}
     )
     assert finalize_1.status_code == 201
     lock_id = finalize_1.json()["finalized_month_id"]
@@ -98,7 +98,7 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
     reopen_resp = await app_client.post(
         "/api/v1/month-close/reopen",
         headers=auth_headers,
-        json={"year": 2027, "month": 4, "reason": "Found a missing GRN"},
+        json={"year": 2022, "month": 4, "reason": "Found a missing GRN"},
     )
     assert reopen_resp.status_code == 204
 
@@ -109,13 +109,13 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
         json={
             "vendor_id": str(vendor_id), "dia_grade_id": str(dia_id),
             "weighbridge_weight_kg": "100", "receipt_type": "against_po",
-            "gate_entry_at": "2027-04-15T09:00:00Z",
+            "gate_entry_at": "2022-04-15T09:00:00Z",
         },
     )
     assert grn_resp.status_code == 201
 
     finalize_2 = await app_client.post(
-        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2027, "month": 4}
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 4}
     )
     assert finalize_2.status_code == 201
     snapshot_2 = finalize_2.json()["snapshot_id"]

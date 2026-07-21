@@ -28,6 +28,21 @@ class NotFinalized(DomainError):
     """Reopen attempted on a period that was never finalized. -> HTTP 404."""
 
 
+class FutureMonthFinalize(DomainError):
+    """Finalizing a month that hasn't ended yet. -> HTTP 422. Finalizing locks
+    the period against all future entries; doing so for a future month would
+    lock out data that hasn't even been entered yet (and snapshot an Abstract
+    built from an incomplete month). The current month is allowed -- a QS may
+    legitimately close the books mid-month once entry is done -- but anything
+    strictly after the current month is refused."""
+
+    def __init__(self, year: int, month: int):
+        super().__init__(
+            f"cannot finalize {year}-{month:02d}: it is in the future; "
+            "finalizing locks the period against entries that don't exist yet"
+        )
+
+
 class MonthCloseService:
     def __init__(self, session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
         self._session = session
@@ -45,6 +60,13 @@ class MonthCloseService:
         what actually prevents a second finalize -- caught here as a clean
         409, not a raw IntegrityError.
         """
+        # Refuse a future period -- see FutureMonthFinalize. Compare (year,
+        # month) tuples: the current calendar month is allowed, anything after
+        # it is not.
+        today = datetime.now(timezone.utc).date()
+        if (year, month) > (today.year, today.month):
+            raise FutureMonthFinalize(year, month)
+
         existing = await self._locks.get_for_period(self._project_id, year, month)
         if existing is not None and existing.status == "locked":
             raise AlreadyFinalized(year, month)

@@ -101,3 +101,35 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
   return <>{children}</>
 }
+
+/** Route guard for admin-only pages. A non-admin (a QS) who somehow lands on
+ * an /admin route is redirected to their own dashboard rather than shown a
+ * dead end. Assumes it sits inside RequireAuth, so `user` is already present. */
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (user && user.role !== "admin") {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <>{children}</>
+}
+
+/** Route guard for QS-only (project-scoped) pages. Those endpoints reject an
+ * admin (400 "must specify a project explicitly") because an admin has no
+ * single project, so an admin landing on one — by typing the URL or an old
+ * link — is sent to the admin dashboard instead of a dead 400 page. */
+export function RequireQS({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (user && user.role === "admin") {
+    return <Navigate to="/admin" replace />
+  }
+  return <>{children}</>
+}
+
+/** The authenticated landing route (`/dashboard`). Admins don't have a single
+ * project to show, so they're sent to the multi-site admin dashboard; QS users
+ * see their project dashboard as before. */
+export function RoleHome({ qs, admin }: { qs: ReactNode; admin: ReactNode }) {
+  const { user } = useAuth()
+  if (user?.role === "admin") return <>{admin}</>
+  return <>{qs}</>
+}

@@ -46,6 +46,24 @@ class NotFoundError(DomainError):
     """Requested row does not exist (or isn't visible under RLS). -> HTTP 404."""
 
 
+class CorrectionScopeMismatch(DomainError):
+    """A correction tried to change the physical identity (tower/floor/element/
+    dia) of the row it supersedes -> HTTP 422. A correction re-states HOW MUCH
+    was measured, never WHAT was measured -- otherwise 'Correct' becomes a lever
+    to vanish one entry and substitute an unrelated one under a correction's
+    audit label. A wrong-scope original is fixed by correcting its weight to 0
+    and entering the right row fresh, keeping both moves visible.
+    """
+
+    def __init__(self, field: str, original: str, attempted: str):
+        self.field = field
+        super().__init__(
+            f"correction must keep the original's {field} "
+            f"(original {original}, attempted {attempted}); "
+            "corrections re-state the measurement, never the element it belongs to"
+        )
+
+
 class AlreadyCorrected(DomainError):
     """Attempted to correct a row that another row already supersedes -> HTTP 409.
     Corrections must form a chain (A<-B<-C), never a fork (B and C both

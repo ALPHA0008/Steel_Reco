@@ -1,7 +1,7 @@
 """Automates the manual end-to-end Abstract verification done during
 implementation (plan §12, Phase 1d finding): every section must trace
 correctly back to real ledger rows, and the derived arithmetic
-(C=A-B, G=E+F, H=C-G, K=I+J, L=H-K, M=K/G) must be internally consistent.
+(C=A-B, G=E+F, H=C-G, K=I+J, L=H-K, M=L/G) must be internally consistent.
 """
 
 import uuid

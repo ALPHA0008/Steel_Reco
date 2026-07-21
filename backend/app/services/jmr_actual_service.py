@@ -2,7 +2,13 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import AlreadyCorrected, BlockingRuleViolation, MonthLocked, NotFoundError
+from app.exceptions import (
+    AlreadyCorrected,
+    BlockingRuleViolation,
+    CorrectionScopeMismatch,
+    MonthLocked,
+    NotFoundError,
+)
 from app.models.system import ExceptionLog
 from app.models.transactions import JmrActual
 from app.repositories.bbs_plan_repository import BbsPlanRepository
@@ -51,6 +57,24 @@ class JmrActualService:
             existing_correction = await self._repo.superseded_by(payload.corrected_from_id)
             if existing_correction is not None:
                 raise AlreadyCorrected(str(payload.corrected_from_id), str(existing_correction))
+
+            # The ORIGINAL's period must be open too, not just the correction's
+            # own date. Superseding is retroactive -- the original stops
+            # counting the moment the correction lands, so a correction dated
+            # into an open month would silently rewrite an already-finalized
+            # Abstract without Reopen. Lock check on both ends closes that.
+            if await self._locks.is_finalized(
+                self._project_id, original.effective_date.year, original.effective_date.month
+            ):
+                raise MonthLocked(original.effective_date.year, original.effective_date.month)
+
+            # A correction re-states the measurement, never what was measured.
+            # Letting scope drift would let "Correct" vanish one entry and
+            # substitute an unrelated one under a correction's audit label.
+            for field in ("tower_id", "floor_id", "element_id", "dia_grade_id", "contractor_id"):
+                orig_val, new_val = getattr(original, field), getattr(payload, field)
+                if orig_val != new_val:
+                    raise CorrectionScopeMismatch(field, str(orig_val), str(new_val))
 
         # Pre-fetch every value both rules need, inside this transaction (same
         # shape as grn_service's anchor pre-fetch) -- the rules themselves do

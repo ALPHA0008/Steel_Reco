@@ -39,6 +39,11 @@ export function JmrNewPage() {
   // Everything prefills from the original; the QS changes what was wrong and
   // saves -- the new row supersedes the old one (which stops counting).
   const correctFrom = (location.state as { correctFrom?: JmrActual } | null)?.correctFrom ?? null
+  // A correction re-states the measurement, never WHAT was measured -- the
+  // backend rejects (422 correction_scope_mismatch) any change to
+  // tower/floor/element/dia/contractor. Lock those fields in the UI so the QS
+  // can only touch the weight (and supporting refs), never hits that error.
+  const scopeLocked = correctFrom != null
 
   const [towerId, setTowerId] = useState(correctFrom?.tower_id ?? "")
   const floors = useFloors(towerId || undefined)
@@ -135,6 +140,7 @@ export function JmrNewPage() {
                       setFloorId("")
                       setElementId("")
                     }}
+                    disabled={scopeLocked}
                   >
                     <SelectTrigger id={p.id} aria-invalid={p["aria-invalid"]} className="w-full">
                       <SelectValue placeholder={towers.isLoading ? "Loading…" : "Select tower"} />
@@ -160,7 +166,7 @@ export function JmrNewPage() {
                       setFloorId(v)
                       setElementId("")
                     }}
-                    disabled={!towerId}
+                    disabled={scopeLocked || !towerId}
                   >
                     <SelectTrigger id={p.id} aria-invalid={p["aria-invalid"]} className="w-full">
                       <SelectValue
@@ -184,7 +190,7 @@ export function JmrNewPage() {
               error={fieldErrors.element_id}
               description="Optional, but required for BBS-plan and duplicate-pour checks — an entry with no element can't be validated against the plan."
               render={(p) => (
-                <Select value={elementId} onValueChange={setElementId} disabled={!floorId}>
+                <Select value={elementId} onValueChange={setElementId} disabled={scopeLocked || !floorId}>
                   <SelectTrigger id={p.id} className="w-full">
                     <SelectValue
                       placeholder={!floorId ? "Pick a floor first" : elements.isLoading ? "Loading…" : "Optional"}
@@ -223,7 +229,7 @@ export function JmrNewPage() {
               required
               error={fieldErrors.dia_grade_id}
               render={(p) => (
-                <Select value={diaId} onValueChange={setDiaId}>
+                <Select value={diaId} onValueChange={setDiaId} disabled={scopeLocked}>
                   <SelectTrigger id={p.id} aria-invalid={p["aria-invalid"]} className="w-full">
                     <SelectValue placeholder={dias.isLoading ? "Loading…" : "Select diameter"} />
                   </SelectTrigger>
@@ -262,7 +268,7 @@ export function JmrNewPage() {
                 label="Contractor"
                 error={fieldErrors.contractor_id}
                 render={(p) => (
-                  <Select value={contractorId} onValueChange={setContractorId}>
+                  <Select value={contractorId} onValueChange={setContractorId} disabled={scopeLocked}>
                     <SelectTrigger id={p.id} className="w-full">
                       <SelectValue placeholder="Optional" />
                     </SelectTrigger>
@@ -306,7 +312,7 @@ export function JmrNewPage() {
                 disabled={createJmr.isPending}
                 className="bg-brand text-brand-foreground hover:bg-brand-hover"
               >
-                {createJmr.isPending ? "Saving…" : "Add JMR row"}
+                {createJmr.isPending ? "Saving…" : correctFrom ? "Save correction" : "Add JMR row"}
               </Button>
               <Button type="button" variant="ghost" asChild>
                 <Link to="/jmr">Cancel</Link>

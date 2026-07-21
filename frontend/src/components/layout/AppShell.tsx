@@ -2,10 +2,13 @@ import { useState } from "react"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
 import {
   ArrowLeftRight,
+  Building2,
   ClipboardCheck,
   FileText,
   Grid3x3,
+  HeartPulse,
   LayoutDashboard,
+  LayoutGrid,
   PackageOpen,
   Receipt,
   Recycle,
@@ -67,14 +70,25 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: "Report",
-    items: [{ to: "/abstract", label: "Abstract", icon: Table2 }],
+    items: [
+      { to: "/abstract", label: "Abstract", icon: Table2 },
+      { to: "/data-health", label: "Data Health", icon: HeartPulse },
+    ],
   },
 ]
 
-const ADMIN_NAV_GROUP: { label: string; items: NavItem[] } = {
-  label: "Admin",
-  items: [{ to: "/admin/users", label: "Users", icon: Users }],
-}
+// Admins don't do daily ledger entry -- their nav is the single company-wide
+// dashboard and user management. This REPLACES the QS ledger nav for an admin
+// (they never land on a single project's ledger).
+const ADMIN_NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Admin",
+    items: [
+      { to: "/dashboard", label: "Admin Dashboard", icon: LayoutGrid, end: true },
+      { to: "/admin/users", label: "Users", icon: Users },
+    ],
+  },
+]
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -89,7 +103,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/physical-counts": "Physical Count",
   "/scrap": "Scrap Sales",
   "/abstract": "Monthly Steel Abstract",
-  "/admin": "Users",
+  "/data-health": "Data Health",
+  "/admin": "Admin Dashboard",
   "/styleguide": "Styleguide",
 }
 
@@ -105,13 +120,20 @@ function initials(name: string): string {
 export function AppShell() {
   const { user } = useAuth()
   const location = useLocation()
-  const base = "/" + (location.pathname.split("/")[1] ?? "")
-  const title = PAGE_TITLES[base === "/" ? "/" : base] ?? "Digi Reco"
+  const isAdmin = user?.role === "admin"
+  const segments = location.pathname.split("/").filter(Boolean)
+  const base = "/" + (segments[0] ?? "")
+  // Admin's dashboard is the single company-wide view; a per-site drill-in
+  // gets its own title.
+  let title: string
+  if (segments[0] === "admin" && segments[1] === "sites") title = "Site"
+  else if (base === "/dashboard" && isAdmin) title = "Admin Dashboard"
+  else title = PAGE_TITLES[base === "/" ? "/" : base] ?? "Digi Reco"
 
   const [expanded, setExpanded] = useState(false)
   const collapsed = !expanded
 
-  const navGroups = user?.role === "admin" ? [...NAV_GROUPS, ADMIN_NAV_GROUP] : NAV_GROUPS
+  const navGroups = isAdmin ? ADMIN_NAV_GROUPS : NAV_GROUPS
 
   return (
     <TooltipProvider delayDuration={200}>
