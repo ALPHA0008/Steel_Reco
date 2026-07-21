@@ -51,6 +51,23 @@ export function ScatterChart({
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ maxHeight: height }}>
+        {/* decision-matrix quadrants: divide at cap (y) and mid-volume (x).
+            Top-right (high volume, over cap) = the worst / priority quadrant. */}
+        {(() => {
+          const xMid = x(maxX / 2)
+          const yCap = y(capPct)
+          return (
+            <g>
+              {/* priority quadrant (high volume, over cap) tinted danger */}
+              <rect x={xMid} y={padT} width={W - padR - xMid} height={yCap - padT} fill="var(--danger)" opacity={0.05} />
+              {/* healthy quadrant (any volume, under cap) tinted success faintly */}
+              <rect x={padL} y={yCap} width={W - padR - padL} height={padT + plotH - yCap} fill="var(--success)" opacity={0.04} />
+              <line x1={xMid} y1={padT} x2={xMid} y2={padT + plotH} stroke="var(--border)" strokeWidth={0.8} strokeDasharray="3 3" />
+              <text x={W - padR - 4} y={padT + 11} textAnchor="end" className="fill-danger/70 text-[8.5px] font-semibold">PRIORITY · high volume, over cap</text>
+              <text x={padL + 4} y={padT + plotH - 5} className="fill-success/70 text-[8.5px] font-semibold">HEALTHY · under cap</text>
+            </g>
+          )
+        })()}
         {/* grid + y ticks */}
         {yTicks.map((t) => (
           <g key={`y${t}`}>
