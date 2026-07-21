@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { HealthGauge } from "@/components/app/health-gauge"
 import { StatTile } from "@/components/app/stat-tile"
 import { InsightsPanel } from "@/components/app/insights-panel"
+import { AlertsCenter } from "@/components/app/alerts-center"
+import { OperationalTimeline } from "@/components/app/timeline"
 import { SiteExplorer } from "@/pages/admin/SiteExplorer"
 import { SiteDrawer } from "@/pages/admin/SiteDrawer"
 import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
@@ -130,6 +132,21 @@ export function AdminDashboardPage() {
       ) : (
         <div className="mb-8">
           <InsightsPanel insights={data.insights} actions={data.recommended_actions} onOpenSite={openSite} />
+        </div>
+      )}
+
+      {/* ============ Alerts + operational timeline ============ */}
+      {q.isLoading || !data ? (
+        <Skeleton className="mb-8 h-[300px] rounded-2xl" />
+      ) : (
+        <div className="mb-8 grid grid-cols-[1fr_1fr] gap-4">
+          <AlertsCenter sites={sites} onOpen={openSiteObj} />
+          <div className="rounded-2xl border bg-card p-5 shadow-(--shadow-card)">
+            <h2 className="mb-3 text-[14px] font-semibold tracking-tight">Operational timeline</h2>
+            <div className="max-h-[340px] overflow-y-auto pr-1">
+              <OperationalTimeline items={data.timeline} />
+            </div>
+          </div>
         </div>
       )}
 
