@@ -1,112 +1,43 @@
-import { useMemo } from "react"
-import { useNavigate } from "react-router-dom"
+import { useMemo, useState } from "react"
 import { AlertTriangle, ArrowLeftRight, Building2, PackageOpen, Recycle, TriangleAlert } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
-import { EmptyState } from "@/components/app/empty-state"
 import { Banner } from "@/components/app/banner"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { HealthGauge } from "@/components/app/health-gauge"
 import { StatTile } from "@/components/app/stat-tile"
 import { InsightsPanel } from "@/components/app/insights-panel"
-import { Sparkline } from "@/components/app/sparkline"
+import { SiteExplorer } from "@/pages/admin/SiteExplorer"
+import { SiteDrawer } from "@/pages/admin/SiteDrawer"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
 import { useAdminAnalytics } from "@/lib/queries"
 import type { AnalyticsSite } from "@/lib/types"
 
-function fmtMT(n: number): string {
-  return n.toLocaleString("en-IN", { maximumFractionDigits: 0 })
-}
-
-const RISK_CHIP: Record<AnalyticsSite["risk"], string> = {
-  low: "bg-success-subtle text-success",
-  medium: "bg-info-subtle text-info",
-  high: "bg-warning-subtle text-warning",
-  critical: "bg-danger-subtle text-danger",
-}
-
-/** Rich site card — name/location, health, wastage vs cap, sparkline, stats. */
-function SiteCard({ site, onOpen }: { site: AnalyticsSite; onOpen: () => void }) {
-  const w = site.wastage_pct
-  const tone = w == null ? "muted" : site.over_cap ? "danger" : "success"
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "group flex flex-col gap-3 rounded-2xl border bg-card p-4 text-left shadow-(--shadow-card) transition-all",
-        "hover:border-brand-border hover:shadow-[0_4px_24px_rgba(20,20,22,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-subtle text-brand-text">
-            <Building2 className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="truncate text-[14px] font-semibold text-foreground">{site.name}</div>
-            {site.location && <div className="truncate text-[11.5px] text-muted-foreground">{site.location}</div>}
-          </div>
-        </div>
-        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide", RISK_CHIP[site.risk])}>
-          {site.risk}
-        </span>
-      </div>
-
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <div className="text-[11px] font-medium text-muted-foreground">Wastage</div>
-          <div
-            className={cn(
-              "tnum font-display text-[24px] font-semibold leading-none tracking-tight",
-              tone === "danger" && "text-danger",
-              tone === "success" && "text-success",
-            )}
-          >
-            {w == null ? "—" : `${w.toFixed(2)}%`}
-          </div>
-        </div>
-        <span className={cn("flex h-9 w-[120px] items-end justify-end", tone === "danger" ? "text-danger" : tone === "success" ? "text-success" : "text-muted-foreground")}>
-          {site.spark.length >= 2 ? (
-            <Sparkline data={site.spark} width={120} height={34} />
-          ) : w != null ? (
-            <span className="text-[10px] font-medium text-muted-foreground">single reading</span>
-          ) : null}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
-        <div>
-          <div className="tnum text-[13px] font-semibold text-foreground">{fmtMT(site.received_mt)}</div>
-          <div className="text-[10.5px] text-muted-foreground">MT recv</div>
-        </div>
-        <div>
-          <div className="tnum text-[13px] font-semibold text-foreground">{site.health}</div>
-          <div className="text-[10.5px] text-muted-foreground">health</div>
-        </div>
-        <div>
-          <div className={cn("tnum text-[13px] font-semibold", site.open_exceptions > 0 ? "text-foreground" : "text-muted-foreground")}>
-            {site.open_exceptions.toLocaleString("en-IN")}
-          </div>
-          <div className="text-[10.5px] text-muted-foreground">flags</div>
-        </div>
-      </div>
-    </button>
-  )
-}
-
-/** Executive admin dashboard: hero (health + KPIs) -> insights -> sites ->
- * analytics. Everything reads from the single cached analytics payload. */
+/** Executive admin dashboard: hero (health + KPIs) -> insights -> site
+ * explorer + drawer -> analytics. Everything reads from the single cached
+ * analytics payload; drilling into a site opens a drawer, not a navigation. */
 export function AdminDashboardPage() {
   const { user } = useAuth()
   const q = useAdminAnalytics()
-  const navigate = useNavigate()
   const data = q.data
 
   const sites = useMemo(() => data?.sites ?? [], [data])
-  const openSite = (id: string) => navigate(`/admin/sites/${id}`)
+  const [drawerSite, setDrawerSite] = useState<AnalyticsSite | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const openSite = (id: string) => {
+    const s = sites.find((x) => x.project_id === id)
+    if (s) {
+      setDrawerSite(s)
+      setDrawerOpen(true)
+    }
+  }
+  const openSiteObj = (s: AnalyticsSite) => {
+    setDrawerSite(s)
+    setDrawerOpen(true)
+  }
 
   const maxWastage = useMemo(() => Math.max(3, ...sites.map((s) => s.wastage_pct ?? 0)), [sites])
 
@@ -198,26 +129,21 @@ export function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ============ Sites ============ */}
+      {/* ============ Site Performance Explorer ============ */}
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold tracking-tight">Sites</h2>
-        <span className="text-xs text-muted-foreground">{sites.length} sites · click to open</span>
+        <h2 className="text-[15px] font-semibold tracking-tight">Site performance</h2>
+        <span className="text-xs text-muted-foreground">click a row for the full breakdown</span>
       </div>
       {q.isLoading ? (
-        <div className="mb-8 grid grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}
-        </div>
-      ) : sites.length === 0 ? (
-        <Card className="mb-8">
-          <EmptyState icon={<Building2 />} title="No sites yet" description="Sites appear here once their ledgers are imported." />
-        </Card>
+        <Skeleton className="mb-8 h-[360px] rounded-2xl" />
       ) : (
-        <div className="mb-8 grid grid-cols-3 gap-4">
-          {sites.map((s) => (
-            <SiteCard key={s.project_id} site={s} onOpen={() => openSite(s.project_id)} />
-          ))}
+        <div className="mb-8">
+          <SiteExplorer sites={sites} onOpen={openSiteObj} />
         </div>
       )}
+
+      {/* Project detail drawer */}
+      <SiteDrawer site={drawerSite} open={drawerOpen} onOpenChange={setDrawerOpen} />
 
       {/* ============ Analytics (Phase 4 will expand this) ============ */}
       {data && (
