@@ -2,14 +2,14 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class GrnCreate(BaseModel):
     vendor_id: uuid.UUID
     dia_grade_id: uuid.UUID
     po_reference: str | None = None
-    weighbridge_weight_kg: Decimal
+    weighbridge_weight_kg: Decimal = Field(gt=0)
     receipt_type: str  # against_po | other_site_sap | other_site_excel
     source_site: str | None = None
     gate_entry_at: datetime
@@ -20,13 +20,26 @@ class GrnCreate(BaseModel):
     # against and flags it, per the trust-tier model.
     po_id: uuid.UUID | None = None
     supplier_invoice_id: uuid.UUID | None = None
-    gross_weight_kg: Decimal | None = None
-    tare_weight_kg: Decimal | None = None
+    gross_weight_kg: Decimal | None = Field(default=None, gt=0)
+    tare_weight_kg: Decimal | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _other_site_requires_source(self) -> "GrnCreate":
         if self.receipt_type in ("other_site_sap", "other_site_excel") and not self.source_site:
             raise ValueError("source_site is required when receipt_type is other_site_sap or other_site_excel")
+        return self
+
+    @model_validator(mode="after")
+    def _tare_below_gross(self) -> "GrnCreate":
+        """Mirror of the ck_grn_tare_below_gross DB CHECK -- a tare heavier
+        than gross means a negative net, which the inbound-reconciliation rule
+        would then compare nonsensically against the weighbridge net."""
+        if (
+            self.gross_weight_kg is not None
+            and self.tare_weight_kg is not None
+            and self.tare_weight_kg >= self.gross_weight_kg
+        ):
+            raise ValueError("tare_weight_kg must be less than gross_weight_kg")
         return self
 
 
@@ -56,10 +69,22 @@ class GrnResponse(BaseModel):
     warning: str | None = None
 
 
+class GrnPoSummaryRow(BaseModel):
+    """One row per distinct po_reference text -- surfaces receiving structure
+    honestly while no real PO master data is linked (see po_reference_summary)."""
+
+    po_reference: str
+    grn_count: int
+    total_kg: Decimal
+    first_date: date
+    last_date: date
+    linked_count: int  # of grn_count, how many have a real po_id FK (today: always 0)
+
+
 class StoreIssueCreate(BaseModel):
     contractor_id: uuid.UUID
     dia_grade_id: uuid.UUID
-    quantity_kg: Decimal
+    quantity_kg: Decimal = Field(gt=0)
     direction: str = "out"  # out | in (return to store)
     issuing_staff: str | None = None
     effective_date: date
@@ -85,7 +110,7 @@ class StoreIssueResponse(BaseModel):
 class InterSiteTransferCreate(BaseModel):
     to_project_id: uuid.UUID
     dia_grade_id: uuid.UUID
-    quantity_kg: Decimal
+    quantity_kg: Decimal = Field(gt=0)
     flag: str  # loan | return
     record_source: str  # sap | excel
     ho_approval_ref: str | None = None
@@ -111,6 +136,7 @@ class InterSiteTransferResponse(BaseModel):
     corrected_from_id: uuid.UUID | None
     created_by: uuid.UUID
     created_at: datetime
+    warning: str | None = None  # populated when transfer_exceeds_stock fired (advisory)
 
 
 class BbsPlanCreate(BaseModel):
@@ -120,7 +146,7 @@ class BbsPlanCreate(BaseModel):
     bar_mark: str | None = None
     pour_description: str | None = None
     dia_grade_id: uuid.UUID
-    planned_weight_kg: Decimal
+    planned_weight_kg: Decimal = Field(gt=0)
     drawing_ref: str | None = None
     contractor_id: uuid.UUID | None = None
 
@@ -150,7 +176,7 @@ class JmrActualCreate(BaseModel):
     element_id: uuid.UUID | None = None
     bar_mark: str | None = None
     dia_grade_id: uuid.UUID
-    measured_weight_kg: Decimal
+    measured_weight_kg: Decimal = Field(gt=0)
     contractor_id: uuid.UUID | None = None
     pour_number: str | None = None
     drawing_ref: str | None = None
@@ -183,9 +209,9 @@ class JmrActualResponse(BaseModel):
 
 
 class CutPieceCreate(BaseModel):
-    length_mm: int
-    nos: int
-    weight_kg: Decimal
+    length_mm: int = Field(gt=0)
+    nos: int = Field(gt=0)
+    weight_kg: Decimal = Field(gt=0)
     classification: str  # reusable | used_as_safety_steel | scrap
 
     @model_validator(mode="after")
@@ -201,14 +227,25 @@ class CutPieceCreate(BaseModel):
 class PhysicalCountCreate(BaseModel):
     contractor_id: uuid.UUID
     dia_grade_id: uuid.UUID
-    bundle_count: int = 0
-    each_bundle_weight_kg: Decimal | None = None
-    loose_rod_count: int = 0
-    each_rod_weight_kg: Decimal | None = None
+    bundle_count: int = Field(default=0, ge=0)
+    each_bundle_weight_kg: Decimal | None = Field(default=None, gt=0)
+    loose_rod_count: int = Field(default=0, ge=0)
+    each_rod_weight_kg: Decimal | None = Field(default=None, gt=0)
     photo_uri: str | None = None
     effective_date: date
     notes: str | None = None
     cut_pieces: list[CutPieceCreate] = []
+
+    @model_validator(mode="after")
+    def _weight_required_when_counted(self) -> "PhysicalCountCreate":
+        """A bundle/rod count with no per-unit weight contributes 0 to Section I
+        (the query multiplies count x weight), silently under-stating physical
+        stock and inflating apparent wastage. Mirror the frontend's own check."""
+        if self.bundle_count > 0 and self.each_bundle_weight_kg is None:
+            raise ValueError("each_bundle_weight_kg is required when bundle_count > 0")
+        if self.loose_rod_count > 0 and self.each_rod_weight_kg is None:
+            raise ValueError("each_rod_weight_kg is required when loose_rod_count > 0")
+        return self
 
 
 class CutPieceResponse(BaseModel):
@@ -242,9 +279,9 @@ class PhysicalCountResponse(BaseModel):
 
 
 class ScrapSaleCreate(BaseModel):
-    buyer_name: str
-    weight_kg: Decimal
-    rate_per_kg: Decimal
+    buyer_name: str = Field(min_length=1)
+    weight_kg: Decimal = Field(gt=0)
+    rate_per_kg: Decimal = Field(ge=0)
     gate_pass_no: str | None = None
     invoice_ref: str | None = None
     effective_date: date

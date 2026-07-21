@@ -3,6 +3,36 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
+class PeriodBoundsResponse(BaseModel):
+    """Earliest and latest month with any real ledger activity for this
+    project -- lets the frontend bound its month/year picker instead of
+    letting a user land on a period with no data by accident. `null` for
+    both means the project has no transactions at all yet.
+    """
+
+    earliest_year: int | None
+    earliest_month: int | None
+    latest_year: int | None
+    latest_month: int | None
+
+
+class WastageTrendPoint(BaseModel):
+    """One month's CUMULATIVE wastage % (Section M), as of that month-end --
+    each point re-runs the same live Abstract computation for that period,
+    never a separately-tracked series (plan §0 invariant: no summary number
+    is ever anything but freshly computed from the ledger)."""
+
+    year: int
+    month: int
+    period_label: str
+    wastage_pct: Decimal | None
+
+
+class WastageTrendResponse(BaseModel):
+    contract_wastage_cap_pct: Decimal
+    points: list[WastageTrendPoint]
+
+
 class AbstractResponse(BaseModel):
     """Sections A-N, all in KG (canonical unit, plan §0) keyed by diameter_mm
     as a string (Decimal isn't JSON-native). MT conversion is a frontend/export
@@ -25,7 +55,7 @@ class AbstractResponse(BaseModel):
     sections_ij_physical_stock: list[dict]
     section_k_total_physical: dict[str, Decimal]  # by dia: I + J (already in sections_ij row)
     section_l_wastage_qty: dict[str, Decimal]  # by dia: H - K
-    section_m_wastage_pct: Decimal | None  # literal file formula: K / G (plan §4 note)
+    section_m_wastage_pct: Decimal | None  # M = L / G, verified 2026-07-16 against the real business formula
     section_n_scrap_sold_kg: Decimal
 
     # Aggregate cross-checks computed over the whole Abstract (E+F vs BBS,

@@ -20,6 +20,39 @@ class AbstractRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def activity_bounds(self, project_id: uuid.UUID) -> dict:
+        """Earliest and latest effective_date across every ledger table for
+        this project. Used to bound the Abstract's period picker to months
+        that actually have data -- the cumulative-ledger design (no
+        month_start) means any period after the latest real entry returns
+        identical totals to that latest entry, which looks like a distinct
+        month's Abstract but isn't; the picker must not let that happen by
+        accident.
+        """
+        result = await self.session.execute(
+            text(
+                """
+                SELECT MIN(d) AS earliest, MAX(d) AS latest FROM (
+                    SELECT effective_date AS d FROM grn WHERE project_id = :pid
+                    UNION ALL
+                    SELECT effective_date FROM inter_site_transfer
+                        WHERE from_project_id = :pid OR to_project_id = :pid
+                    UNION ALL
+                    SELECT effective_date FROM store_issue WHERE project_id = :pid
+                    UNION ALL
+                    SELECT effective_date FROM jmr_actual WHERE project_id = :pid
+                    UNION ALL
+                    SELECT effective_date FROM physical_count WHERE project_id = :pid
+                    UNION ALL
+                    SELECT effective_date FROM scrap_sale WHERE project_id = :pid
+                ) all_dates
+                """
+            ),
+            {"pid": project_id},
+        )
+        row = result.fetchone()
+        return {"earliest": row.earliest, "latest": row.latest}
+
     async def section_a_received(self, project_id: uuid.UUID, month_end: date) -> list[dict]:
         """Section A: grn grouped by dia x receipt_type. Cumulative from
         project start through month_end (no month_start bound) -- the
@@ -141,8 +174,8 @@ class AbstractRepository:
                 WITH latest_progress AS (
                     SELECT DISTINCT ON (element_id) element_id, completion_pct
                     FROM element_progress
-                    WHERE project_id = :pid AND as_of_date <= :month_end
-                    ORDER BY element_id, as_of_date DESC
+                    WHERE project_id = :pid AND as_of_date < :month_end
+                    ORDER BY element_id, as_of_date DESC, id DESC
                 )
                 SELECT dg.diameter_mm AS dia, bp.contractor_id,
                        SUM(bp.planned_weight_kg * lp.completion_pct / 100.0) AS wip_kg
@@ -178,8 +211,8 @@ class AbstractRepository:
                 WITH latest AS (
                     SELECT DISTINCT ON (contractor_id, dia_grade_id) *
                     FROM physical_count
-                    WHERE project_id = :pid AND effective_date <= :month_end
-                    ORDER BY contractor_id, dia_grade_id, effective_date DESC
+                    WHERE project_id = :pid AND effective_date < :month_end
+                    ORDER BY contractor_id, dia_grade_id, effective_date DESC, id DESC
                 ),
                 full_length AS (
                     SELECT l.id, l.contractor_id, l.dia_grade_id,
@@ -258,8 +291,8 @@ class AbstractRepository:
                 WITH latest AS (
                     SELECT DISTINCT ON (contractor_id, dia_grade_id) id
                     FROM physical_count
-                    WHERE project_id = :pid AND effective_date <= :month_end
-                    ORDER BY contractor_id, dia_grade_id, effective_date DESC
+                    WHERE project_id = :pid AND effective_date < :month_end
+                    ORDER BY contractor_id, dia_grade_id, effective_date DESC, id DESC
                 )
                 SELECT cp.classification, COALESCE(SUM(cp.nos * cp.weight_kg), 0) AS total_kg
                 FROM latest l JOIN physical_count_cut_piece cp ON cp.physical_count_id = l.id

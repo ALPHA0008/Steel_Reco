@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api } from "./api"
+import {
+  api,
+  fetchAdminMasterSummary,
+  fetchAdminSites,
+  fetchAdminSiteSummary,
+  fetchAdminSiteWastageTrend,
+} from "./api"
 import type {
   AbstractResponse,
   BbsPlan,
@@ -9,15 +15,19 @@ import type {
   DashboardSummary,
   DiaGrade,
   Element,
+  DataHealthResponse,
   ExceptionLog,
   ExceptionResolutionType,
   Floor,
   Grn,
   GrnCreate,
+  GrnPoSummaryRow,
   InterSiteTransfer,
   InterSiteTransferCreate,
   JmrActual,
   JmrActualCreate,
+  PeriodBounds,
+  WastageTrendResponse,
   PhysicalCount,
   PhysicalCountCreate,
   Project,
@@ -71,6 +81,16 @@ export function useGrns() {
   return useQuery({
     queryKey: ["grn"],
     queryFn: async () => (await api.get<Grn[]>("/grn")).data,
+  })
+}
+
+/** Groups every GRN by its raw po_reference text -- honest visibility into
+ * receiving structure while no real PO master data is linked (linked_count
+ * is 0 for every row today). */
+export function useGrnPoSummary() {
+  return useQuery({
+    queryKey: ["grn-po-summary"],
+    queryFn: async () => (await api.get<GrnPoSummaryRow[]>("/grn/po-summary")).data,
   })
 }
 
@@ -224,6 +244,85 @@ export function useAbstract(year: number, month: number) {
     queryKey: ["abstract", year, month],
     queryFn: async () =>
       (await api.get<AbstractResponse>("/abstract", { params: { year, month } })).data,
+  })
+}
+
+/** Bounds the Abstract's period picker to months that actually have ledger
+ * activity (never let the UI imply a month has data it doesn't). */
+export function usePeriodBounds() {
+  return useQuery({
+    queryKey: ["abstract-period-bounds"],
+    queryFn: async () => (await api.get<PeriodBounds>("/abstract/period-bounds")).data,
+    staleTime: MASTERS_STALE,
+  })
+}
+
+/** Cumulative wastage % as of every month-end with real activity -- powers
+ * the dashboard's wastage trend chart. */
+export function useWastageTrend() {
+  return useQuery({
+    queryKey: ["abstract-wastage-trend"],
+    queryFn: async () => (await api.get<WastageTrendResponse>("/abstract/wastage-trend")).data,
+    staleTime: MASTERS_STALE,
+  })
+}
+
+// ---- Admin multi-site dashboard (admin-only endpoints) ----
+
+/** All real sites with their current headline numbers -- the admin dashboard.
+ * The backend serves summaries fast (~1s) and fills in each site's sparkline a
+ * moment later (background trend warm). While any sparkline is still empty, we
+ * poll briefly so the sparklines pop in without a manual refresh, then stop. */
+export function useAdminSites() {
+  return useQuery({
+    queryKey: ["admin-sites"],
+    queryFn: fetchAdminSites,
+    staleTime: 60 * 1000,
+    refetchInterval: (query) => {
+      const data = query.state.data
+      if (!data || data.length === 0) return false
+      const anyMissingSpark = data.some((s) => (s.wastage_spark?.length ?? 0) === 0 && s.wastage_pct != null)
+      // Keep polling every 2.5s until every site that has a wastage figure also
+      // has its sparkline; then stop.
+      return anyMissingSpark ? 2500 : false
+    },
+  })
+}
+
+/** Company-wide roll-up across every real site. */
+export function useAdminMasterSummary() {
+  return useQuery({
+    queryKey: ["admin-master-summary"],
+    queryFn: fetchAdminMasterSummary,
+    staleTime: 60 * 1000,
+  })
+}
+
+/** One site's current-month headline numbers (admin-scoped). */
+export function useAdminSiteSummary(projectId: string | undefined) {
+  return useQuery({
+    queryKey: ["admin-site-summary", projectId],
+    queryFn: () => fetchAdminSiteSummary(projectId as string),
+    enabled: Boolean(projectId),
+  })
+}
+
+/** One site's full wastage trend (admin-scoped). */
+export function useAdminSiteWastageTrend(projectId: string | undefined) {
+  return useQuery({
+    queryKey: ["admin-site-wastage-trend", projectId],
+    queryFn: () => fetchAdminSiteWastageTrend(projectId as string),
+    enabled: Boolean(projectId),
+    staleTime: MASTERS_STALE,
+  })
+}
+
+/** Per-section data-completeness panel -- what's real, aggregate, synthetic,
+ * or known-stale, plus PO-linkage % and exception counts. */
+export function useDataHealth() {
+  return useQuery({
+    queryKey: ["abstract-data-health"],
+    queryFn: async () => (await api.get<DataHealthResponse>("/abstract/data-health")).data,
   })
 }
 

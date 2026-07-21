@@ -34,5 +34,12 @@ class ExceptionService:
         row.resolved_by = self._user_id
         row.resolved_at = datetime.now(timezone.utc)
         await self._session.commit()
-        await self._session.refresh(row)
+        # Deliberately no session.refresh() here: set_rls_context() uses
+        # set_config(..., is_local=true) (transaction-scoped), so commit()
+        # above clears the RLS GUCs the same way COMMIT always would --
+        # refresh()'s implicit re-SELECT then runs with no RLS context,
+        # can_access_project() fails closed, and refresh() throws
+        # "Could not refresh instance" even though the UPDATE committed fine.
+        # Every field on `row` is already correct in memory (no server-side
+        # defaults/triggers touch this row), so there's nothing to reload.
         return row

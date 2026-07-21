@@ -51,3 +51,42 @@ class SetSignupCodeRequest(BaseModel):
 class SignupCodeResponse(BaseModel):
     project_id: uuid.UUID
     signup_code: str
+
+
+# ---- Admin multi-site dashboard ----
+
+from decimal import Decimal  # noqa: E402
+
+
+class AdminSiteSummary(BaseModel):
+    """One row/card in the admin's all-sites overview -- the site plus its
+    current headline numbers and a compact wastage sparkline, so the dashboard
+    shows real figures (and a mini trend) without a per-site round-trip."""
+
+    project_id: uuid.UUID
+    name: str
+    location: str | None
+    status: str
+    contract_wastage_pct: Decimal
+    period_label: str | None = None
+    total_received_kg: Decimal = Decimal("0")
+    total_issued_kg: Decimal = Decimal("0")
+    total_scrap_sold_kg: Decimal = Decimal("0")
+    wastage_pct: Decimal | None = None
+    over_cap: bool = False
+    open_exceptions: int = 0
+    # Compact per-month wastage % for a card sparkline (nulls dropped). Empty
+    # when the site has no month-by-month wastage history yet.
+    wastage_spark: list[float] = []
+
+
+class AdminMasterSummary(BaseModel):
+    """Company-wide roll-up across every real site."""
+
+    site_count: int
+    sites_over_cap: int
+    total_received_kg: Decimal
+    total_issued_kg: Decimal
+    total_scrap_sold_kg: Decimal
+    open_exceptions: int
+    weighted_wastage_pct: Decimal | None  # Sigma L / Sigma G across sites

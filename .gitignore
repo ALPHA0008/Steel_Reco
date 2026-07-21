@@ -80,4 +80,12 @@ skills-lock.json
 # ========================
 GRN_rebar_APAS.xlsx
 docs_scanned_M99.pdf
+# Raw SAP dumps, company reconciliation workbook, scanned invoices and the
+# generated Test Project source files -- real business data / large binaries,
+# read from disk by the loader scripts at runtime; never committed.
+*.pdf
+*.xlsx
+*.XLSX
+TestProject/
+scratchpad/
 

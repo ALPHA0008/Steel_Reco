@@ -2,7 +2,7 @@ from fastapi import APIRouter, status
 
 from app.dependencies import CurrentUser, ProjectScope, ScopedSession
 from app.repositories.grn_repository import GrnRepository
-from app.schemas.transactions import GrnCreate, GrnResponse
+from app.schemas.transactions import GrnCreate, GrnPoSummaryRow, GrnResponse
 from app.services.grn_service import GrnService
 
 router = APIRouter(prefix="/api/v1/grn", tags=["grn"])
@@ -12,6 +12,16 @@ router = APIRouter(prefix="/api/v1/grn", tags=["grn"])
 async def list_grn(project_id: ProjectScope, session: ScopedSession) -> list[GrnResponse]:
     items, _total = await GrnRepository(session, project_id=project_id).list(limit=200)
     return [GrnResponse.model_validate(g) for g in items]
+
+
+@router.get("/po-summary", response_model=list[GrnPoSummaryRow])
+async def get_po_summary(project_id: ProjectScope, session: ScopedSession) -> list[GrnPoSummaryRow]:
+    """Groups every GRN by its raw po_reference text -- makes the receiving
+    structure legible even though no real PO master data is linked yet (every
+    GRN today shows "(unlinked)" for lack of a matching purchase_order row).
+    """
+    rows = await GrnRepository(session, project_id=project_id).po_reference_summary(project_id)
+    return [GrnPoSummaryRow(**r) for r in rows]
 
 
 @router.post("", response_model=GrnResponse, status_code=status.HTTP_201_CREATED)

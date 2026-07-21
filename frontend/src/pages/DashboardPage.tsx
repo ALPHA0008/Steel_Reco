@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
+import { WastageTrendArea } from "@/components/app/wastage-trend-area"
 import {
   useDashboardSummary,
   useDiaGrades,
@@ -24,6 +25,7 @@ import {
   useMyProject,
   useStoreIssues,
   useVendors,
+  useWastageTrend,
   diaLabel,
   formatKg,
 } from "@/lib/queries"
@@ -44,6 +46,7 @@ export function DashboardPage() {
   const issues = useStoreIssues()
   const vendors = useVendors()
   const dias = useDiaGrades()
+  const wastageTrend = useWastageTrend()
 
   const vendorById = useMemo(() => new Map((vendors.data ?? []).map((v) => [v.id, v])), [vendors.data])
   const diaById = useMemo(() => new Map((dias.data ?? []).map((d) => [d.id, d])), [dias.data])
@@ -175,11 +178,22 @@ export function DashboardPage() {
         <div className="border-b px-5 py-3.5">
           <h2 className="text-[15px] font-semibold tracking-tight">Wastage trend</h2>
         </div>
-        <EmptyState
-          icon={<LineChart />}
-          title="Trend appears once history is imported"
-          description="The Abstract is cumulative from project start — the month-by-month wastage curve against the cap unlocks when the legacy ledger is backfilled."
-        />
+        {wastageTrend.isLoading ? (
+          <Skeleton className="m-5 h-[220px] rounded-lg" />
+        ) : wastageTrend.data && wastageTrend.data.points.length > 0 ? (
+          <div className="p-5">
+            <WastageTrendArea
+              points={wastageTrend.data.points}
+              capPct={parseFloat(wastageTrend.data.contract_wastage_cap_pct)}
+            />
+          </div>
+        ) : (
+          <EmptyState
+            icon={<LineChart />}
+            title="Trend appears once history is imported"
+            description="The Abstract is cumulative from project start — the month-by-month wastage curve against the cap unlocks when the legacy ledger is backfilled."
+          />
+        )}
       </Card>
     </Page>
   )

@@ -181,6 +181,7 @@ export interface InterSiteTransfer {
   actual_return_date: string | null
   effective_date: string
   created_at: string
+  warning: string | null
 }
 
 // ---- BBS / JMR ----
@@ -313,6 +314,34 @@ export interface DashboardSummary {
   wastage_pct: string | null
 }
 
+// ---- Admin multi-site dashboard ----
+
+export interface AdminSiteSummary {
+  project_id: string
+  name: string
+  location: string | null
+  status: string
+  contract_wastage_pct: string
+  period_label: string | null
+  total_received_kg: string
+  total_issued_kg: string
+  total_scrap_sold_kg: string
+  wastage_pct: string | null
+  over_cap: boolean
+  open_exceptions: number
+  wastage_spark: number[]
+}
+
+export interface AdminMasterSummary {
+  site_count: number
+  sites_over_cap: number
+  total_received_kg: string
+  total_issued_kg: string
+  total_scrap_sold_kg: string
+  open_exceptions: number
+  weighted_wastage_pct: string | null
+}
+
 // ---- Abstract (sections A–N, all KG; computed, never stored) ----
 
 export interface AbstractSectionARow {
@@ -359,6 +388,53 @@ export interface AbstractSectionIJRow {
   cut_piece_stock_kg: string | null
   cut_piece_scrap_kg: string | null
   total_physical_kg: string | null
+}
+
+export interface GrnPoSummaryRow {
+  po_reference: string
+  grn_count: number
+  total_kg: string
+  first_date: string
+  last_date: string
+  linked_count: number
+}
+
+export interface SectionHealth {
+  code: string
+  label: string
+  status: "real" | "aggregate" | "synthetic" | "computed" | "stale"
+  detail: string
+}
+
+export interface DataHealthResponse {
+  generated_for_period: string
+  sections: SectionHealth[]
+  po_invoice_linkage_pct: number | null
+  grn_total: number
+  grn_linked: number
+  open_exceptions: number
+  total_exceptions: number
+  earliest_activity: string | null
+  latest_activity: string | null
+}
+
+export interface PeriodBounds {
+  earliest_year: number | null
+  earliest_month: number | null
+  latest_year: number | null
+  latest_month: number | null
+}
+
+export interface WastageTrendPoint {
+  year: number
+  month: number
+  period_label: string
+  wastage_pct: string | null
+}
+
+export interface WastageTrendResponse {
+  contract_wastage_cap_pct: string
+  points: WastageTrendPoint[]
 }
 
 export interface AbstractResponse {

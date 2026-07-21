@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { ChevronDown, LayoutDashboard, LogOut, Table2, TriangleAlert } from "lucide-react"
+import { ChevronDown, LayoutDashboard, LogOut, Table2, TriangleAlert, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import {
@@ -19,10 +19,18 @@ function initials(name: string): string {
     .toUpperCase()
 }
 
-const QUICK_LINKS = [
+// QS quick links point at project-scoped pages; an admin has no single project
+// and those endpoints reject admins (400 "must specify a project explicitly"),
+// so admins get admin-scoped destinations instead.
+const QS_QUICK_LINKS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/exceptions", label: "Exceptions", icon: TriangleAlert },
   { to: "/abstract", label: "Monthly Abstract", icon: Table2 },
+]
+
+const ADMIN_QUICK_LINKS = [
+  { to: "/dashboard", label: "Admin Dashboard", icon: LayoutDashboard },
+  { to: "/admin/users", label: "Users", icon: Users },
 ]
 
 /**
@@ -36,8 +44,10 @@ export function AccountMenu({ showName = false }: { showName?: boolean }) {
   if (!user) return null
 
   const name = user.full_name || user.username
-  const roleLabel = user.role === "admin" ? "Administrator" : "Quantity Surveyor"
+  const isAdmin = user.role === "admin"
+  const roleLabel = isAdmin ? "Administrator" : "Quantity Surveyor"
   const badge = initials(name)
+  const quickLinks = isAdmin ? ADMIN_QUICK_LINKS : QS_QUICK_LINKS
 
   return (
     <DropdownMenu>
@@ -85,7 +95,7 @@ export function AccountMenu({ showName = false }: { showName?: boolean }) {
 
         <DropdownMenuSeparator />
 
-        {QUICK_LINKS.map((link) => (
+        {quickLinks.map((link) => (
           <DropdownMenuItem key={link.to} asChild>
             <Link
               to={link.to}

@@ -1,8 +1,8 @@
 import { lazy, Suspense } from "react"
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "@/components/ui/sonner"
-import { AuthProvider, RequireAuth } from "@/lib/auth"
+import { AuthProvider, RequireAuth, RequireAdmin, RequireQS, RoleHome } from "@/lib/auth"
 import { AppShell } from "@/components/layout/AppShell"
 import { LoginPage } from "@/pages/LoginPage"
 import { SignupPage } from "@/pages/SignupPage"
@@ -64,8 +64,17 @@ const PhysicalCountNewPage = lazy(() =>
 const ScrapListPage = lazy(() => import("@/pages/scrap/ScrapListPage").then((m) => ({ default: m.ScrapListPage })))
 const ScrapNewPage = lazy(() => import("@/pages/scrap/ScrapNewPage").then((m) => ({ default: m.ScrapNewPage })))
 const AbstractPage = lazy(() => import("@/pages/abstract/AbstractPage").then((m) => ({ default: m.AbstractPage })))
+const DataHealthPage = lazy(() =>
+  import("@/pages/data-health/DataHealthPage").then((m) => ({ default: m.DataHealthPage })),
+)
 const AdminUsersPage = lazy(() =>
   import("@/pages/admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
+)
+const AdminDashboardPage = lazy(() =>
+  import("@/pages/admin/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })),
+)
+const AdminSitePage = lazy(() =>
+  import("@/pages/admin/AdminSitePage").then((m) => ({ default: m.AdminSitePage })),
 )
 
 function RouteFallback() {
@@ -93,28 +102,39 @@ export default function App() {
                   </RequireAuth>
                 }
               >
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/exceptions" element={<ExceptionsInboxPage />} />
-                <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
-                <Route path="/purchase-orders/new" element={<PurchaseOrderNewPage />} />
-                <Route path="/invoices" element={<InvoiceListPage />} />
-                <Route path="/invoices/new" element={<InvoiceNewPage />} />
-                <Route path="/grn" element={<GrnListPage />} />
-                <Route path="/grn/new" element={<GrnNewPage />} />
-                <Route path="/store-issues" element={<StoreIssueListPage />} />
-                <Route path="/store-issues/new" element={<StoreIssueNewPage />} />
-                <Route path="/transfers" element={<TransferListPage />} />
-                <Route path="/transfers/new" element={<TransferNewPage />} />
-                <Route path="/bbs" element={<BbsListPage />} />
-                <Route path="/bbs/new" element={<BbsNewPage />} />
-                <Route path="/jmr" element={<JmrListPage />} />
-                <Route path="/jmr/new" element={<JmrNewPage />} />
-                <Route path="/physical-counts" element={<PhysicalCountListPage />} />
-                <Route path="/physical-counts/new" element={<PhysicalCountNewPage />} />
-                <Route path="/scrap" element={<ScrapListPage />} />
-                <Route path="/scrap/new" element={<ScrapNewPage />} />
-                <Route path="/abstract" element={<AbstractPage />} />
-                <Route path="/admin/users" element={<AdminUsersPage />} />
+                <Route
+                  path="/dashboard"
+                  element={<RoleHome qs={<DashboardPage />} admin={<AdminDashboardPage />} />}
+                />
+                {/* QS-only, project-scoped pages. Admins have no single project
+                    and these endpoints reject them (400), so RequireQS bounces
+                    an admin to /admin rather than showing a dead error page. */}
+                <Route element={<RequireQS><Outlet /></RequireQS>}>
+                  <Route path="/exceptions" element={<ExceptionsInboxPage />} />
+                  <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
+                  <Route path="/purchase-orders/new" element={<PurchaseOrderNewPage />} />
+                  <Route path="/invoices" element={<InvoiceListPage />} />
+                  <Route path="/invoices/new" element={<InvoiceNewPage />} />
+                  <Route path="/grn" element={<GrnListPage />} />
+                  <Route path="/grn/new" element={<GrnNewPage />} />
+                  <Route path="/store-issues" element={<StoreIssueListPage />} />
+                  <Route path="/store-issues/new" element={<StoreIssueNewPage />} />
+                  <Route path="/transfers" element={<TransferListPage />} />
+                  <Route path="/transfers/new" element={<TransferNewPage />} />
+                  <Route path="/bbs" element={<BbsListPage />} />
+                  <Route path="/bbs/new" element={<BbsNewPage />} />
+                  <Route path="/jmr" element={<JmrListPage />} />
+                  <Route path="/jmr/new" element={<JmrNewPage />} />
+                  <Route path="/physical-counts" element={<PhysicalCountListPage />} />
+                  <Route path="/physical-counts/new" element={<PhysicalCountNewPage />} />
+                  <Route path="/scrap" element={<ScrapListPage />} />
+                  <Route path="/scrap/new" element={<ScrapNewPage />} />
+                  <Route path="/abstract" element={<AbstractPage />} />
+                  <Route path="/data-health" element={<DataHealthPage />} />
+                </Route>
+                <Route path="/admin" element={<RequireAdmin><AdminDashboardPage /></RequireAdmin>} />
+                <Route path="/admin/sites/:projectId" element={<RequireAdmin><AdminSitePage /></RequireAdmin>} />
+                <Route path="/admin/users" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
                 <Route path="/styleguide" element={<StyleguidePage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>

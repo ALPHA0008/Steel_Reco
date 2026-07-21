@@ -53,7 +53,7 @@ export function TransferNewPage() {
     }
 
     try {
-      await createTransfer.mutateAsync({
+      const created = await createTransfer.mutateAsync({
         to_project_id: toProjectId.trim(),
         dia_grade_id: diaId,
         quantity_kg: quantity,
@@ -63,7 +63,13 @@ export function TransferNewPage() {
         expected_return_date: expectedReturn || null,
         effective_date: effectiveDate,
       })
-      toast.success("Transfer recorded.")
+      // A loan-out exceeding available stock saves but is flagged (advisory) —
+      // surface it like the store-issue / JMR forms do, don't swallow it.
+      if (created?.warning) {
+        toast.warning(created.warning)
+      } else {
+        toast.success("Transfer recorded.")
+      }
       navigate("/transfers")
     } catch (err) {
       setFieldErrors(apiFieldErrors(err))

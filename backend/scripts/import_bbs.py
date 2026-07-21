@@ -56,12 +56,55 @@ _LEVEL_SEGMENT_RE = re.compile(r"^(B\d(-\w+)*|FDN-\w+|B\d-GF|GF-\w+)$", re.IGNOR
 # Reconciliation/actuals workbooks live alongside the BBS plans in the same
 # folders -- they must never feed bbs_plan (their JMR/cut-length/stock sheets
 # are ACTUALS; importing them as "plan" would corrupt the ground truth the
-# jmr_exceeds_bbs_plan rule checks against).
-_EXCLUDE_FILE_RE = re.compile(r"(?i)recon|store\s*report|scrap|\bgrn\b")
+# jmr_exceeds_bbs_plan rule checks against). Files matching this are excluded
+# WHOLESALE: confirmed (by reading their formulas) they contain no genuine
+# bar-mark BBS content, only rollup/consumption/summary sheets.
+_EXCLUDE_FILE_RE = re.compile(r"(?i)store\s*report|scrap|\bgrn\b")
+
+# Found 2026-07-15 by tracing the master workbook's cross-file formulas
+# (7,250 cells reference external workbooks, confirmed via openpyxl's
+# _external_links): these "-recon"/"-RECON" named files are NOT pure actuals
+# like the master reconciliation workbook -- each mixes a handful of
+# reconciliation-rollup sheets (already live-pulled into the master's Qty
+# Backup sheets as Consumption/WIP -- e.g. 'STEEL ABSTRACT T1' matches the
+# KLC sheet's Tower-1 breakdown row-for-row after a /1000 unit conversion)
+# with DOZENS of genuine bar-mark BBS sheets for sub-structure/basement work
+# that the old blanket "recon" filename filter was silently excluding
+# entirely. Un-excluded by name in walk_and_parse(); their rollup sheets are
+# skipped via _MIXED_RECON_ROLLUP_RE below instead of the normal
+# summary-sheet-wins logic, because these files have no legitimate "this
+# sheet rolls up everything else in THIS file" summary -- their rollups
+# either pull from OTHER files (a cross-reference, e.g. NTA-recon.xlsx's own
+# 'CH (Sub and Super)' tab, verified to be Club House data, not NTA's) or are
+# themselves feeding the MASTER workbook's Consumption/WIP -- not a rollup of
+# this file's own bar-mark sheets, so summary-sheet-wins' "if a summary
+# exists, drop the components" logic would be exactly backwards here.
+_MIXED_RECON_FILES = {
+    "NTA-recon.xlsx",
+    "Type-1 Sub Structure-RECON.xlsx",
+    "Type-2 Sub Structure-Recon.xlsx",
+}
+
+# Verified by direct inspection: 'Summary' sums the same file's FDN-B3/B3-B2/
+# B2-B1/B1-Podium tabs (a rollup-of-own-sheets, unlike the pour-file ABSTRACT
+# pattern below); 'Abstract' (bare) is a billing/RA-bill sheet full of #REF!
+# errors, not a quantity table at all; 'CH (Sub and Super)' is Club House
+# data cross-referenced into the NTA file, not NTA's own steel. 'STEEL
+# ABSTRACT *' matches the Tower-N reconciliation-rollup pattern confirmed for
+# T1 (an exact row-for-row match, after unit conversion, to the master's own
+# Qty Backup sheet) -- assumed to generalize to the T2/T4/T6 variants seen in
+# sheet-name listings but not each individually re-verified; the
+# implausibility ceiling in _extract_for_header is the backstop if that
+# assumption is wrong for a specific one.
+_MIXED_RECON_ROLLUP_RE = re.compile(
+    r"(?i)^steel abstract|^summary$|^abstract$|^ch \(sub and super\)$"
+    r"|^fdn-b3$|^b3-b2$|^b2-b1$|^b1-\s*podium\s*$"
+)
 
 # A sheet named like this is the pour's own rolled-up summary of the other
 # sheets in the same file -- when present, it alone is the file's plan and the
 # component sheets are skipped (parsing both would double-count every bar).
+# Does NOT apply to _MIXED_RECON_FILES -- see above.
 _SUMMARY_SHEET_RE = re.compile(r"(?i)abstract|summary")
 
 
@@ -281,17 +324,29 @@ def walk_and_parse(root: Path) -> ParseReport:
             if plan.method.startswith("REJECTED"):
                 report.skipped.append((f, f"{plan.sheet}: {plan.method}"))
 
-        # summary-sheet-wins: a pour file's own Abstract/Summary sheet already
-        # rolls up its component sheets -- keep only the summary to avoid
-        # counting every bar twice
-        summaries = [p for p in good if _SUMMARY_SHEET_RE.search(p.sheet)]
-        if summaries:
+        if f.name in _MIXED_RECON_FILES:
+            # These files have no legitimate "rolls up my own sheets" summary
+            # -- skip only the known reconciliation-rollup sheets (they feed
+            # elsewhere, e.g. the master workbook's Consumption/WIP), keep
+            # every genuine bar-mark component sheet independently.
+            kept, dropped = [], []
             for p in good:
-                if p not in summaries:
-                    report.skipped.append(
-                        (f, f"{p.sheet}: component sheet superseded by summary sheet")
-                    )
-            good = summaries
+                (dropped if _MIXED_RECON_ROLLUP_RE.search(p.sheet) else kept).append(p)
+            for p in dropped:
+                report.skipped.append((f, f"{p.sheet}: reconciliation-rollup sheet, not a BBS plan"))
+            good = kept
+        else:
+            # summary-sheet-wins: a pour file's own Abstract/Summary sheet already
+            # rolls up its component sheets -- keep only the summary to avoid
+            # counting every bar twice
+            summaries = [p for p in good if _SUMMARY_SHEET_RE.search(p.sheet)]
+            if summaries:
+                for p in good:
+                    if p not in summaries:
+                        report.skipped.append(
+                            (f, f"{p.sheet}: component sheet superseded by summary sheet")
+                        )
+                good = summaries
         report.parsed.extend(good)
     return report
 

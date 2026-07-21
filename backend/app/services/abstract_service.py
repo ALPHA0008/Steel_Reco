@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.abstract_repository import AbstractRepository
-from app.schemas.abstract import AbstractResponse
+from app.schemas.abstract import AbstractResponse, PeriodBoundsResponse, WastageTrendPoint, WastageTrendResponse
 
 PIPELINE_VERSION = "abstract@v1"
 
@@ -41,7 +41,46 @@ class AbstractService:
     def __init__(self, session: AsyncSession) -> None:
         self._repo = AbstractRepository(session)
 
-    async def compute(self, project_id: uuid.UUID, year: int, month: int) -> AbstractResponse:
+    async def get_period_bounds(self, project_id: uuid.UUID) -> PeriodBoundsResponse:
+        bounds = await self._repo.activity_bounds(project_id)
+        earliest, latest = bounds["earliest"], bounds["latest"]
+        return PeriodBoundsResponse(
+            earliest_year=earliest.year if earliest else None,
+            earliest_month=earliest.month if earliest else None,
+            latest_year=latest.year if latest else None,
+            latest_month=latest.month if latest else None,
+        )
+
+    async def get_wastage_trend(self, project_id: uuid.UUID) -> WastageTrendResponse:
+        """Section M (cumulative wastage %) as of every month-end from the
+        project's earliest to latest real activity -- each point is a full
+        re-run of compute(), same as the on-screen Abstract for that period,
+        never a separately-tracked series."""
+        bounds = await self._repo.activity_bounds(project_id)
+        earliest, latest = bounds["earliest"], bounds["latest"]
+        cap = await self._repo.contract_wastage_cap_pct(project_id)
+        points: list[WastageTrendPoint] = []
+        if earliest is not None and latest is not None:
+            year, month = earliest.year, earliest.month
+            while (year, month) <= (latest.year, latest.month):
+                # Trend needs only section_m; skip the findings queries.
+                abstract = await self.compute(project_id, year, month, with_findings=False)
+                points.append(
+                    WastageTrendPoint(
+                        year=year, month=month, period_label=abstract.period_label,
+                        wastage_pct=abstract.section_m_wastage_pct,
+                    )
+                )
+                year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+        return WastageTrendResponse(contract_wastage_cap_pct=cap or Decimal("3.00"), points=points)
+
+    async def compute(
+        self, project_id: uuid.UUID, year: int, month: int, with_findings: bool = True
+    ) -> AbstractResponse:
+        """with_findings=False skips the aggregate cross-check queries, which
+        the on-screen Abstract needs but the wastage-trend (which reads only
+        section_m) does not. Default True preserves every existing caller's
+        behavior exactly."""
         month_end = _month_end(year, month)
 
         section_a = await self._repo.section_a_received(project_id, month_end)
@@ -78,17 +117,32 @@ class AbstractService:
             for dia in set(h_by_dia) | set(k_by_dia)
         }
 
-        # M = K/G exactly as the legacy sheet literally defines it (plan §4
-        # note: physical stock / consumption+WIP, on TOTALS across all dia --
-        # not the intuitive wastage/consumption. Flagged in the plan as
-        # needing QS confirmation before being trusted; computed here as
-        # specified so the number exists to compare against, not withheld.
-        total_k = sum(k_by_dia.values(), Decimal("0"))
+        # M = L/G (Wastage Qty / Consumption+WIP), on TOTALS across all dia.
+        # CORRECTED 2026-07-16: this was previously K/G (physical stock /
+        # consumption+WIP), a guess flagged from the start as "the legacy
+        # sheet's own formula, never confirmed". The real formula was found
+        # in the company-wide "Copy of Recon Steel" consolidated workbook's
+        # own Abstract sheet: its stated monthly wastage% for APAS (e.g.
+        # 4.8176% for Feb-2026) reproduces exactly as
+        # (Theoretical stock - Physical stock) / (Consumption+WIP) = L/G --
+        # i.e. wastage as a fraction of what was actually used, not physical
+        # stock remaining as a fraction of what was used. Verified against
+        # that file's own row labels ("Wastage = Difference in Theoretical
+        # stock - Physical stock", "% Wastage = G/E%" where their G is this
+        # Wastage Qty and their E is Consumption+WIP) and their numbers
+        # reproduce to 4 decimal places.
+        total_l = sum(l_by_dia.values(), Decimal("0"))
         total_g = sum(g_by_dia.values(), Decimal("0"))
-        m_wastage_pct = (total_k / total_g * 100) if total_g != 0 else None
+        m_wastage_pct = (total_l / total_g * 100) if total_g != 0 else None
 
-        findings = await self._compute_findings(
-            project_id, month_end, g_by_dia, l_by_dia, m_wastage_pct, scrap_kg
+        d_by_dia = _sum_by_dia(section_d, "net_issued_kg")
+        findings = (
+            await self._compute_findings(
+                project_id, month_end, g_by_dia, l_by_dia, m_wastage_pct, scrap_kg,
+                c_by_dia=c_by_dia, d_by_dia=d_by_dia,
+            )
+            if with_findings
+            else []
         )
 
         return AbstractResponse(
@@ -131,8 +185,35 @@ class AbstractService:
         l_by_dia: dict[str, Decimal],
         m_wastage_pct: Decimal | None,
         scrap_sold_kg: Decimal,
+        c_by_dia: dict[str, Decimal] | None = None,
+        d_by_dia: dict[str, Decimal] | None = None,
     ) -> list[dict]:
         findings: list[dict] = []
+
+        # 0. THE core catch (plan §3.2): issued (D) must never exceed net
+        # received (C) -- you cannot hand a contractor steel you never took
+        # in. The legacy Excel sets D=C by formula so this is structurally
+        # invisible there; here D is a genuine sum of issue rows and C a
+        # genuine sum of receipts, so a real D>C surfaces. It means either
+        # receipts are under-recorded (e.g. inter-site steel not in SAP) or
+        # issues are overstated -- both worth money, both must be explained.
+        if c_by_dia is not None and d_by_dia is not None:
+            c_total = sum(c_by_dia.values(), Decimal("0"))
+            d_total = sum(d_by_dia.values(), Decimal("0"))
+            if d_total > c_total + Decimal("1"):  # 1kg float-noise guard
+                findings.append({
+                    "rule": "issued_exceeds_net_received",
+                    "severity": "critical",
+                    "dia": None,
+                    "actual_kg": str(d_total),
+                    "threshold_kg": str(c_total),
+                    "message": (
+                        f"Issued to contractors ({d_total/1000:.2f} MT) exceeds net received "
+                        f"({c_total/1000:.2f} MT) by {(d_total-c_total)/1000:.2f} MT -- physically "
+                        "impossible. Either receipts are under-recorded (inter-site steel not in "
+                        "SAP?) or issues are overstated. The legacy Excel's D=C formula hides this."
+                    ),
+                })
 
         # 1. Consumption + WIP vs total BBS plan, per dia. Two distinct
         # failure shapes: booked steel exceeds everything that was ever
