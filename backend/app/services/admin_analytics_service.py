@@ -27,7 +27,7 @@ from sqlalchemy import func, select, text
 from app.database import async_session_factory, set_rls_context
 from app.models.structure import Project
 from app.models.system import ExceptionLog
-from app.services.abstract_service import AbstractService, _month_end
+from app.services.abstract_service import AbstractService
 
 
 def _f(x) -> float:
@@ -360,7 +360,6 @@ async def build_admin_analytics() -> dict:
         for p in projects
     ))
     facts = list(facts)
-    by_id = {f.project_id: f for f in facts}
     real = [f for f in facts if f.wastage_pct is not None]
 
     # 3. derivations
@@ -402,6 +401,24 @@ async def build_admin_analytics() -> dict:
             "trend": [{"year": y, "month": m, "wastage_pct": w} for (y, m, w) in f.trend],
         })
 
+    # portfolio monthly wastage trend: average of each month's site wastages
+    # (only real readings), plus a 3-month moving average and a next-month
+    # projection. Honest aggregate -- a mean of the sites reporting that month.
+    month_acc: dict[tuple[int, int], list[float]] = {}
+    for f in facts:
+        for (yy, mm, w) in f.trend:
+            if w is not None:
+                month_acc.setdefault((yy, mm), []).append(w)
+    portfolio_trend = []
+    for (yy, mm) in sorted(month_acc):
+        vals = month_acc[(yy, mm)]
+        portfolio_trend.append({"year": yy, "month": mm, "wastage_pct": round(sum(vals) / len(vals), 3)})
+    pt_series = [p["wastage_pct"] for p in portfolio_trend]
+    pt_ma = _moving_average(pt_series, 3)
+    for p, ma in zip(portfolio_trend, pt_ma):
+        p["moving_avg"] = ma
+    pt_forecast = round(sum(pt_series[-3:]) / len(pt_series[-3:]), 2) if len(pt_series) >= 2 else None
+
     # portfolio-level Sankey / waterfall (sum across sites)
     p_received = sum(f.received_mt for f in facts)
     p_consumed = sum(f.consumed_mt for f in facts)
@@ -425,6 +442,8 @@ async def build_admin_analytics() -> dict:
             "open_exceptions": sum(f.open_exceptions for f in facts),
         },
         "sites": sites_payload,
+        "portfolio_trend": portfolio_trend,
+        "portfolio_forecast_pct": pt_forecast,
         "insights": _insights(facts, healths),
         "recommended_actions": _recommended_actions(facts, healths),
         "sankey": {

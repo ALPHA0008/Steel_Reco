@@ -9,6 +9,12 @@ import { StatTile } from "@/components/app/stat-tile"
 import { InsightsPanel } from "@/components/app/insights-panel"
 import { SiteExplorer } from "@/pages/admin/SiteExplorer"
 import { SiteDrawer } from "@/pages/admin/SiteDrawer"
+import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
+import { SankeyFlow } from "@/components/app/charts/sankey"
+import { ScatterChart } from "@/components/app/charts/scatter"
+import { Treemap, TreemapLegend } from "@/components/app/charts/treemap"
+import { RiskHeatmap } from "@/components/app/charts/heatmap"
+import { GeoMap } from "@/components/app/charts/geo-map"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
@@ -38,8 +44,6 @@ export function AdminDashboardPage() {
     setDrawerSite(s)
     setDrawerOpen(true)
   }
-
-  const maxWastage = useMemo(() => Math.max(3, ...sites.map((s) => s.wastage_pct ?? 0)), [sites])
 
   if (q.isError) {
     return (
@@ -145,71 +149,96 @@ export function AdminDashboardPage() {
       {/* Project detail drawer */}
       <SiteDrawer site={drawerSite} open={drawerOpen} onOpenChange={setDrawerOpen} />
 
-      {/* ============ Analytics (Phase 4 will expand this) ============ */}
+      {/* ============ Analytics ============ */}
       {data && (
         <>
-          <h2 className="mb-3 text-[15px] font-semibold tracking-tight">Analytics</h2>
+          <h2 className="mb-3 text-[15px] font-semibold tracking-tight">Operational analytics</h2>
+
+          {/* Row 1: portfolio trend + forecast (wide) · material-flow Sankey */}
+          <div className="mb-4 grid grid-cols-[1.5fr_1fr] gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Portfolio wastage trend & forecast</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Monthly mean across reporting sites, 3-mo moving average, next-month projection</div>
+              {data.portfolio_trend.length >= 2 ? (
+                <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
+              ) : (
+                <div className="py-12 text-center text-[13px] text-muted-foreground">Not enough history for a trend yet.</div>
+              )}
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Material flow</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Received → issued → consumed → scrap (MT)</div>
+              <SankeyFlow
+                received={data.sankey.received_mt}
+                issued={data.sankey.issued_mt}
+                consumed={data.sankey.consumed_mt}
+                scrap={data.sankey.scrap_mt}
+                balance={data.sankey.balance_mt}
+              />
+            </Card>
+          </div>
+
+          {/* Row 2: scatter · treemap */}
+          <div className="mb-4 grid grid-cols-2 gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Volume vs wastage</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Are the biggest sites the ones bleeding wastage?</div>
+              <ScatterChart sites={sites} onOpen={openSiteObj} />
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Steel distribution</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Share of steel volume across sites</div>
+              <Treemap sites={sites} onOpen={openSiteObj} />
+              <TreemapLegend />
+            </Card>
+          </div>
+
+          {/* Row 3: risk heatmap (wide) · geo map */}
+          <div className="mb-4 grid grid-cols-[1.4fr_1fr] gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Risk heatmap</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Wastage intensity by site & month</div>
+              <RiskHeatmap sites={sites} onOpen={openSiteObj} />
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Site map</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Bubble = steel volume · color = health</div>
+              <GeoMap sites={sites} onOpen={openSiteObj} />
+            </Card>
+          </div>
+
+          {/* Row 4: Pareto (wastage / scrap / exceptions) */}
           <div className="grid grid-cols-3 gap-4">
-            <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-              <div className="mb-1 text-[13px] font-semibold">Wastage vs cap</div>
-              <div className="mb-3 text-[11.5px] text-muted-foreground">Each site against its 3% contract cap</div>
-              <div className="space-y-2.5">
-                {sites.map((s) => {
-                  const w = s.wastage_pct ?? 0
-                  return (
-                    <button key={s.project_id} type="button" onClick={() => openSite(s.project_id)} className="block w-full text-left">
-                      <div className="mb-0.5 flex items-center justify-between text-[12px]">
-                        <span className="truncate font-medium">{s.name}</span>
-                        <span className={cn("tnum font-semibold", s.over_cap ? "text-danger" : "text-success")}>{w.toFixed(2)}%</span>
+            {([
+              { key: "wastage", title: "Wastage contribution", sub: "Which sites drive total wastage" },
+              { key: "scrap", title: "Scrap contribution", sub: "Which sites drive scrap" },
+              { key: "exceptions", title: "Exception contribution", sub: "Which sites drive open flags" },
+            ] as const).map(({ key, title, sub }) => {
+              const rows = data.pareto[key]
+              const top = rows[0]?.value || 1
+              return (
+                <Card key={key} className="gap-0 p-5 shadow-(--shadow-card)">
+                  <div className="mb-1 text-[13px] font-semibold">{title}</div>
+                  <div className="mb-3 text-[11.5px] text-muted-foreground">{sub}</div>
+                  <div className="space-y-1.5">
+                    {rows.map((r) => (
+                      <div key={r.name} className="rounded-lg p-1.5">
+                        <div className="mb-1 flex items-center justify-between text-[12px]">
+                          <span className="truncate font-medium">{r.name}</span>
+                          <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />
+                        </div>
                       </div>
-                      <div className="relative h-2 overflow-hidden rounded-full bg-muted">
-                        <div className={cn("absolute inset-y-0 left-0 rounded-full", s.over_cap ? "bg-danger" : "bg-success")} style={{ width: `${Math.max(2, (w / maxWastage) * 100)}%` }} />
-                        <div className="absolute inset-y-0 w-px bg-foreground/50" style={{ left: `${(s.cap_pct / maxWastage) * 100}%` }} />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </Card>
-
-            <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-              <div className="mb-1 text-[13px] font-semibold">Wastage contribution (Pareto)</div>
-              <div className="mb-3 text-[11.5px] text-muted-foreground">Which sites drive total wastage</div>
-              <div className="space-y-1">
-                {data.pareto.wastage.map((r) => (
-                  <div key={r.name} className="rounded-lg p-2">
-                    <div className="mb-1 flex items-center justify-between text-[12px]">
-                      <span className="truncate font-medium">{r.name}</span>
-                      <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-brand/70" style={{ width: `${data.pareto.wastage[0].value > 0 ? (r.value / data.pareto.wastage[0].value) * 100 : 0}%` }} />
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </Card>
-
-            <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-              <div className="mb-1 text-[13px] font-semibold">Open exceptions by site</div>
-              <div className="mb-3 text-[11.5px] text-muted-foreground">Unresolved flags needing review</div>
-              <div className="space-y-1">
-                {[...sites].sort((a, b) => b.open_exceptions - a.open_exceptions).map((s) => {
-                  const max = Math.max(1, ...sites.map((x) => x.open_exceptions))
-                  return (
-                    <button key={s.project_id} type="button" onClick={() => openSite(s.project_id)} className="block w-full rounded-lg p-2 text-left transition-colors hover:bg-row-hover">
-                      <div className="mb-1 flex items-center justify-between text-[12px]">
-                        <span className="truncate font-medium">{s.name}</span>
-                        <span className="tnum font-semibold text-foreground">{s.open_exceptions.toLocaleString("en-IN")}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-brand/70" style={{ width: `${(s.open_exceptions / max) * 100}%` }} />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </Card>
+                </Card>
+              )
+            })}
           </div>
         </>
       )}

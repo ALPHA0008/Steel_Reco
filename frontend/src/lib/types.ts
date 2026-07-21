@@ -421,6 +421,8 @@ export interface AdminAnalytics {
     open_exceptions: number
   }
   sites: AnalyticsSite[]
+  portfolio_trend: { year: number; month: number; wastage_pct: number; moving_avg: number | null }[]
+  portfolio_forecast_pct: number | null
   insights: AnalyticsInsight[]
   recommended_actions: AnalyticsAction[]
   sankey: {
