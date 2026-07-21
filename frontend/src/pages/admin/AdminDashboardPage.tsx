@@ -1,291 +1,264 @@
-import { useMemo } from "react"
-import { useNavigate } from "react-router-dom"
-import { Building2, PackageOpen, Recycle, TriangleAlert } from "lucide-react"
+import { useMemo, useState } from "react"
+import { AlertTriangle, ArrowLeftRight, Building2, PackageOpen, Recycle, TriangleAlert } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
-import { KpiCard } from "@/components/app/kpi"
-import { EmptyState } from "@/components/app/empty-state"
 import { Banner } from "@/components/app/banner"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Sparkline } from "@/components/app/sparkline"
+import { HealthGauge } from "@/components/app/health-gauge"
+import { StatTile } from "@/components/app/stat-tile"
+import { InsightsPanel } from "@/components/app/insights-panel"
+import { AlertsCenter } from "@/components/app/alerts-center"
+import { OperationalTimeline } from "@/components/app/timeline"
+import { SiteExplorer } from "@/pages/admin/SiteExplorer"
+import { SiteDrawer } from "@/pages/admin/SiteDrawer"
+import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
+import { SankeyFlow } from "@/components/app/charts/sankey"
+import { ScatterChart } from "@/components/app/charts/scatter"
+import { Treemap, TreemapLegend } from "@/components/app/charts/treemap"
+import { RiskHeatmap } from "@/components/app/charts/heatmap"
+import { GeoMap } from "@/components/app/charts/geo-map"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
-import { useAdminSites, useAdminMasterSummary } from "@/lib/queries"
-import type { AdminSiteSummary } from "@/lib/types"
+import { useAdminAnalytics } from "@/lib/queries"
+import type { AnalyticsSite } from "@/lib/types"
 
-function mt(kg: string | null | undefined): string {
-  if (kg == null) return "—"
-  return (parseFloat(kg) / 1000).toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-}
-function pct(v: string | null): string {
-  return v == null ? "—" : `${parseFloat(v).toFixed(2)}%`
-}
-
-/** One rich site card: name/location, big wastage % + cap chip, sparkline,
- * and a compact stat row. Whole card is the click target into the site. */
-function SiteCard({ site, onOpen }: { site: AdminSiteSummary; onOpen: () => void }) {
-  const w = site.wastage_pct == null ? null : parseFloat(site.wastage_pct)
-  const cap = parseFloat(site.contract_wastage_pct)
-  const tone = w == null ? "muted" : site.over_cap ? "danger" : "success"
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "group flex flex-col gap-3 rounded-xl border bg-card p-4 text-left shadow-(--shadow-card) transition-all",
-        "hover:border-brand-border hover:shadow-[0_4px_20px_rgba(20,20,22,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-subtle text-brand-text">
-            <Building2 className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <div className="truncate text-[14px] font-semibold text-foreground">{site.name}</div>
-            {site.location && <div className="truncate text-[11.5px] text-muted-foreground">{site.location}</div>}
-          </div>
-        </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-            tone === "danger" && "bg-danger-subtle text-danger",
-            tone === "success" && "bg-success-subtle text-success",
-            tone === "muted" && "bg-muted text-muted-foreground",
-          )}
-        >
-          {w == null ? "no data" : site.over_cap ? `▲ over ${cap.toFixed(0)}%` : `within ${cap.toFixed(0)}%`}
-        </span>
-      </div>
-
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <div className="text-[11px] font-medium text-muted-foreground">Wastage</div>
-          <div
-            className={cn(
-              "tnum font-display text-[26px] font-semibold leading-none tracking-tight",
-              tone === "danger" && "text-danger",
-              tone === "success" && "text-success",
-            )}
-          >
-            {w == null ? "—" : `${w.toFixed(2)}%`}
-          </div>
-        </div>
-        <span
-          className={cn(
-            "flex h-9 w-[132px] items-end justify-end",
-            tone === "danger" && "text-danger",
-            tone === "success" && "text-success",
-            tone === "muted" && "text-muted-foreground",
-          )}
-        >
-          {site.wastage_spark.length >= 2 ? (
-            <Sparkline data={site.wastage_spark} />
-          ) : w != null ? (
-            // Single-reading sites (e.g. APAS): no series to spark, so show a
-            // tiny cap meter instead of empty space -- the card still reads as
-            // a visualization, consistent with the others.
-            <span className="flex w-full flex-col items-end gap-1">
-              <span className="text-[10px] font-medium text-muted-foreground">single close reading</span>
-              <span className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (w / (cap * 1.6)) * 100)}%`, background: "currentColor" }} />
-                <span className="absolute inset-y-0 w-px bg-foreground/50" style={{ left: `${Math.min(100, (cap / (cap * 1.6)) * 100)}%` }} />
-              </span>
-            </span>
-          ) : null}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
-        <div>
-          <div className="tnum text-[13px] font-semibold text-foreground">{mt(site.total_received_kg)}</div>
-          <div className="text-[10.5px] text-muted-foreground">MT received</div>
-        </div>
-        <div>
-          <div className="tnum text-[13px] font-semibold text-foreground">{mt(site.total_scrap_sold_kg)}</div>
-          <div className="text-[10.5px] text-muted-foreground">MT scrap</div>
-        </div>
-        <div>
-          <div className={cn("tnum text-[13px] font-semibold", site.open_exceptions > 0 ? "text-foreground" : "text-muted-foreground")}>
-            {site.open_exceptions.toLocaleString("en-IN")}
-          </div>
-          <div className="text-[10.5px] text-muted-foreground">exceptions</div>
-        </div>
-      </div>
-    </button>
-  )
-}
-
-/** Horizontal proportion bar for a metric across sites (analytics section). */
-function ProportionRow({ label, value, max, display, onClick }: { label: string; value: number; max: number; display: string; onClick?: () => void }) {
-  const widthPct = max > 0 ? Math.max(1.5, (value / max) * 100) : 0
-  return (
-    <button type="button" onClick={onClick} className="block w-full rounded-lg p-2 text-left transition-colors hover:bg-row-hover">
-      <div className="mb-1 flex items-center justify-between text-[12.5px]">
-        <span className="flex items-center gap-1.5 font-medium">
-          <Building2 className="size-3 text-muted-foreground" />
-          {label}
-        </span>
-        <span className="tnum font-semibold text-foreground">{display}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-brand/70" style={{ width: `${widthPct}%` }} />
-      </div>
-    </button>
-  )
-}
-
-/** Merged admin dashboard: portfolio KPIs -> rich site cards -> analytics.
- * "All Sites" and "Master Dashboard" are one page now. */
+/** Executive admin dashboard: hero (health + KPIs) -> insights -> site
+ * explorer + drawer -> analytics. Everything reads from the single cached
+ * analytics payload; drilling into a site opens a drawer, not a navigation. */
 export function AdminDashboardPage() {
   const { user } = useAuth()
-  const sites = useAdminSites()
-  const master = useAdminMasterSummary()
-  const navigate = useNavigate()
+  const q = useAdminAnalytics()
+  const data = q.data
 
-  const rows = useMemo(() => sites.data ?? [], [sites.data])
-  const maxWastage = useMemo(
-    () => Math.max(3, ...rows.map((s) => (s.wastage_pct ? parseFloat(s.wastage_pct) : 0))),
-    [rows],
-  )
-  const maxReceived = useMemo(() => Math.max(1, ...rows.map((s) => parseFloat(s.total_received_kg))), [rows])
-  const maxExceptions = useMemo(() => Math.max(1, ...rows.map((s) => s.open_exceptions)), [rows])
+  const sites = useMemo(() => data?.sites ?? [], [data])
+  const [drawerSite, setDrawerSite] = useState<AnalyticsSite | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const receivedSorted = useMemo(() => [...rows].sort((a, b) => parseFloat(b.total_received_kg) - parseFloat(a.total_received_kg)), [rows])
-  const exceptionsSorted = useMemo(() => [...rows].sort((a, b) => b.open_exceptions - a.open_exceptions), [rows])
+  const openSite = (id: string) => {
+    const s = sites.find((x) => x.project_id === id)
+    if (s) {
+      setDrawerSite(s)
+      setDrawerOpen(true)
+    }
+  }
+  const openSiteObj = (s: AnalyticsSite) => {
+    setDrawerSite(s)
+    setDrawerOpen(true)
+  }
+
+  if (q.isError) {
+    return (
+      <Page>
+        <PageHeader title="Admin dashboard" description="Company-wide reconciliation across every site" />
+        <Banner variant="blocking">{apiErrorMessage(q.error, "Could not load the portfolio analytics.")}</Banner>
+      </Page>
+    )
+  }
 
   return (
     <Page>
       <PageHeader
         title="Admin dashboard"
-        description={`Company-wide reconciliation across every site · signed in as ${user?.full_name ?? "admin"}`}
+        description={`Company-wide operational intelligence · signed in as ${user?.full_name ?? "admin"}`}
       />
 
-      {(sites.isError || master.isError) && (
-        <Banner variant="blocking" className="mb-4">
-          {apiErrorMessage(sites.error ?? master.error, "Could not load the portfolio.")}
-        </Banner>
-      )}
-
-      {/* Portfolio KPIs */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
-        {master.isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
-        ) : master.data ? (
-          <>
-            <KpiCard label="Total Received" value={mt(master.data.total_received_kg)} unit="MT" icon={<PackageOpen />} chip={`${master.data.site_count} sites`} />
-            <KpiCard label="Issued to Contractors" value={mt(master.data.total_issued_kg)} unit="MT" icon={<Building2 />} chip="Cumulative" chipTone="info" />
-            <KpiCard label="Scrap Sold" value={mt(master.data.total_scrap_sold_kg)} unit="MT" icon={<Recycle />} chip="All sites" />
-            <KpiCard
-              label="Portfolio Wastage"
-              value={pct(master.data.weighted_wastage_pct)}
-              tone={master.data.sites_over_cap > 0 ? "danger" : "success"}
-              icon={<TriangleAlert />}
-              chip={`${master.data.sites_over_cap} of ${master.data.site_count} over cap`}
-              chipTone={master.data.sites_over_cap > 0 ? "danger" : "success"}
-            />
-          </>
-        ) : null}
-      </div>
-
-      {/* Site cards */}
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold tracking-tight">Sites</h2>
-        <span className="text-xs text-muted-foreground">{rows.length} sites · click to open</span>
-      </div>
-      {sites.isLoading ? (
-        <div className="mb-8 grid grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
-        </div>
-      ) : rows.length === 0 ? (
-        <Card className="mb-8">
-          <EmptyState icon={<Building2 />} title="No sites yet" description="Sites appear here once their ledgers are imported." />
-        </Card>
+      {/* ============ Executive hero ============ */}
+      {q.isLoading || !data ? (
+        <Skeleton className="mb-6 h-[220px] rounded-2xl" />
       ) : (
-        <div className="mb-8 grid grid-cols-3 gap-4">
-          {rows.map((s) => (
-            <SiteCard key={s.project_id} site={s} onOpen={() => navigate(`/admin/sites/${s.project_id}`)} />
-          ))}
+        <div className="mb-6 grid grid-cols-[auto_1fr] gap-4">
+          {/* Health gauge */}
+          <Card className="flex items-center justify-center px-8 py-6 shadow-(--shadow-card)">
+            <HealthGauge score={data.portfolio.health} />
+          </Card>
+
+          {/* KPI grid */}
+          <div className="grid grid-cols-3 grid-rows-2 gap-4">
+            <StatTile
+              label="Total Received"
+              numericValue={data.portfolio.received_mt}
+              unit="MT"
+              icon={<PackageOpen />}
+              spark={sites.map((s) => s.received_mt)}
+              format={(n) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            />
+            <StatTile
+              label="Issued to Contractors"
+              numericValue={data.portfolio.issued_mt}
+              unit="MT"
+              icon={<ArrowLeftRight />}
+              format={(n) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            />
+            <StatTile
+              label="Scrap Sold"
+              numericValue={data.portfolio.scrap_mt}
+              unit="MT"
+              icon={<Recycle />}
+              format={(n) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            />
+            <StatTile
+              label="Portfolio Wastage"
+              numericValue={data.portfolio.wastage_pct ?? 0}
+              unit="%"
+              tone={data.portfolio.sites_over_cap > 0 ? "danger" : "success"}
+              icon={<TriangleAlert />}
+              progress={data.portfolio.wastage_pct ? Math.min(1, data.portfolio.wastage_pct / (3 * 1.6)) : 0}
+              progressLabel={<>vs 3.0% cap</>}
+              format={(n) => n.toFixed(2)}
+            />
+            <StatTile
+              label="Sites Over Cap"
+              numericValue={data.portfolio.sites_over_cap}
+              unit={`/ ${data.portfolio.site_count}`}
+              tone={data.portfolio.sites_over_cap > 0 ? "danger" : "success"}
+              icon={<Building2 />}
+              format={(n) => String(Math.round(n))}
+            />
+            <StatTile
+              label="Open Exceptions"
+              numericValue={data.portfolio.open_exceptions}
+              icon={<AlertTriangle />}
+              tone={data.portfolio.open_exceptions > 0 ? "warning" : "neutral"}
+              format={(n) => Math.round(n).toLocaleString("en-IN")}
+            />
+          </div>
         </div>
       )}
 
-      {/* Analytics */}
-      <h2 className="mb-3 text-[15px] font-semibold tracking-tight">Analytics</h2>
-      <div className="grid grid-cols-3 gap-4">
-        {/* Wastage vs cap — the key reconciliation signal */}
-        <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-          <div className="mb-1 text-[13px] font-semibold">Wastage vs cap</div>
-          <div className="mb-3 text-[11.5px] text-muted-foreground">Each site's % against its {rows[0] ? parseFloat(rows[0].contract_wastage_pct).toFixed(0) : 3}% contract cap</div>
-          {sites.isLoading ? (
-            <Skeleton className="h-40 rounded-lg" />
-          ) : (
-            <div className="space-y-2.5">
-              {rows.map((s) => {
-                const w = s.wastage_pct ? parseFloat(s.wastage_pct) : 0
-                const cap = parseFloat(s.contract_wastage_pct)
-                return (
-                  <button key={s.project_id} type="button" onClick={() => navigate(`/admin/sites/${s.project_id}`)} className="block w-full text-left">
-                    <div className="mb-0.5 flex items-center justify-between text-[12px]">
-                      <span className="truncate font-medium">{s.name}</span>
-                      <span className={cn("tnum font-semibold", s.over_cap ? "text-danger" : "text-success")}>{w.toFixed(2)}%</span>
-                    </div>
-                    <div className="relative h-2 overflow-hidden rounded-full bg-muted">
-                      <div className={cn("absolute inset-y-0 left-0 rounded-full", s.over_cap ? "bg-danger" : "bg-success")} style={{ width: `${Math.max(2, (w / maxWastage) * 100)}%` }} />
-                      <div className="absolute inset-y-0 w-px bg-foreground/50" style={{ left: `${(cap / maxWastage) * 100}%` }} />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </Card>
+      {/* ============ Insights + actions ============ */}
+      {q.isLoading || !data ? (
+        <Skeleton className="mb-8 h-[220px] rounded-2xl" />
+      ) : (
+        <div className="mb-8">
+          <InsightsPanel insights={data.insights} actions={data.recommended_actions} onOpenSite={openSite} />
+        </div>
+      )}
 
-        {/* Received by site */}
-        <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-          <div className="mb-1 text-[13px] font-semibold">Steel received by site</div>
-          <div className="mb-3 text-[11.5px] text-muted-foreground">Cumulative net received (MT)</div>
-          {sites.isLoading ? (
-            <Skeleton className="h-40 rounded-lg" />
-          ) : (
-            <div className="space-y-1">
-              {receivedSorted.map((s) => (
-                <ProportionRow
-                  key={s.project_id}
-                  label={s.name}
-                  value={parseFloat(s.total_received_kg)}
-                  max={maxReceived}
-                  display={`${mt(s.total_received_kg)} MT`}
-                  onClick={() => navigate(`/admin/sites/${s.project_id}`)}
-                />
-              ))}
+      {/* ============ Alerts + operational timeline ============ */}
+      {q.isLoading || !data ? (
+        <Skeleton className="mb-8 h-[300px] rounded-2xl" />
+      ) : (
+        <div className="mb-8 grid grid-cols-[1fr_1fr] gap-4">
+          <AlertsCenter sites={sites} onOpen={openSiteObj} />
+          <div className="rounded-2xl border bg-card p-5 shadow-(--shadow-card)">
+            <h2 className="mb-3 text-[14px] font-semibold tracking-tight">Operational timeline</h2>
+            <div className="max-h-[340px] overflow-y-auto pr-1">
+              <OperationalTimeline items={data.timeline} />
             </div>
-          )}
-        </Card>
+          </div>
+        </div>
+      )}
 
-        {/* Open exceptions by site */}
-        <Card className="col-span-1 gap-0 p-5 shadow-(--shadow-card)">
-          <div className="mb-1 text-[13px] font-semibold">Open exceptions by site</div>
-          <div className="mb-3 text-[11.5px] text-muted-foreground">Unresolved flags needing review</div>
-          {sites.isLoading ? (
-            <Skeleton className="h-40 rounded-lg" />
-          ) : (
-            <div className="space-y-1">
-              {exceptionsSorted.map((s) => (
-                <ProportionRow
-                  key={s.project_id}
-                  label={s.name}
-                  value={s.open_exceptions}
-                  max={maxExceptions}
-                  display={s.open_exceptions.toLocaleString("en-IN")}
-                  onClick={() => navigate(`/admin/sites/${s.project_id}`)}
-                />
-              ))}
-            </div>
-          )}
-        </Card>
+      {/* ============ Site Performance Explorer ============ */}
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[15px] font-semibold tracking-tight">Site performance</h2>
+        <span className="text-xs text-muted-foreground">click a row for the full breakdown</span>
       </div>
+      {q.isLoading ? (
+        <Skeleton className="mb-8 h-[360px] rounded-2xl" />
+      ) : (
+        <div className="mb-8">
+          <SiteExplorer sites={sites} onOpen={openSiteObj} />
+        </div>
+      )}
+
+      {/* Project detail drawer */}
+      <SiteDrawer site={drawerSite} open={drawerOpen} onOpenChange={setDrawerOpen} />
+
+      {/* ============ Analytics ============ */}
+      {data && (
+        <>
+          <h2 className="mb-3 text-[15px] font-semibold tracking-tight">Operational analytics</h2>
+
+          {/* Row 1: portfolio trend + forecast (wide) · material-flow Sankey */}
+          <div className="mb-4 grid grid-cols-[1.5fr_1fr] gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Portfolio wastage trend & forecast</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Monthly mean across reporting sites, 3-mo moving average, next-month projection</div>
+              {data.portfolio_trend.length >= 2 ? (
+                <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
+              ) : (
+                <div className="py-12 text-center text-[13px] text-muted-foreground">Not enough history for a trend yet.</div>
+              )}
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Material flow</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Received → issued → consumed → scrap (MT)</div>
+              <SankeyFlow
+                received={data.sankey.received_mt}
+                issued={data.sankey.issued_mt}
+                consumed={data.sankey.consumed_mt}
+                scrap={data.sankey.scrap_mt}
+                balance={data.sankey.balance_mt}
+              />
+            </Card>
+          </div>
+
+          {/* Row 2: scatter · treemap */}
+          <div className="mb-4 grid grid-cols-2 gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Volume vs wastage</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Are the biggest sites the ones bleeding wastage?</div>
+              <ScatterChart sites={sites} onOpen={openSiteObj} />
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Steel distribution</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Share of steel volume across sites</div>
+              <Treemap sites={sites} onOpen={openSiteObj} />
+              <TreemapLegend />
+            </Card>
+          </div>
+
+          {/* Row 3: risk heatmap (wide) · geo map */}
+          <div className="mb-4 grid grid-cols-[1.4fr_1fr] gap-4">
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Risk heatmap</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Wastage intensity by site & month</div>
+              <RiskHeatmap sites={sites} onOpen={openSiteObj} />
+            </Card>
+
+            <Card className="gap-0 p-5 shadow-(--shadow-card)">
+              <div className="mb-1 text-[13px] font-semibold">Site map</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Bubble = steel volume · color = health</div>
+              <GeoMap sites={sites} onOpen={openSiteObj} />
+            </Card>
+          </div>
+
+          {/* Row 4: Pareto (wastage / scrap / exceptions) */}
+          <div className="grid grid-cols-3 gap-4">
+            {([
+              { key: "wastage", title: "Wastage contribution", sub: "Which sites drive total wastage" },
+              { key: "scrap", title: "Scrap contribution", sub: "Which sites drive scrap" },
+              { key: "exceptions", title: "Exception contribution", sub: "Which sites drive open flags" },
+            ] as const).map(({ key, title, sub }) => {
+              const rows = data.pareto[key]
+              const top = rows[0]?.value || 1
+              return (
+                <Card key={key} className="gap-0 p-5 shadow-(--shadow-card)">
+                  <div className="mb-1 text-[13px] font-semibold">{title}</div>
+                  <div className="mb-3 text-[11.5px] text-muted-foreground">{sub}</div>
+                  <div className="space-y-1.5">
+                    {rows.map((r) => (
+                      <div key={r.name} className="rounded-lg p-1.5">
+                        <div className="mb-1 flex items-center justify-between text-[12px]">
+                          <span className="truncate font-medium">{r.name}</span>
+                          <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </>
+      )}
     </Page>
   )
 }

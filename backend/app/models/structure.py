@@ -22,6 +22,11 @@ class Project(UUIDPkMixin, CreatedAtMixin, Base):
     until an admin sets one; a project with no code cannot be signed up
     against."""
 
+    # Optional site coordinates for the admin geo-map (migration 0009).
+    # Nullable: a site with no coords just doesn't plot.
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
+
 
 class Tower(UUIDPkMixin, CreatedAtMixin, Base):
     __tablename__ = "towers"

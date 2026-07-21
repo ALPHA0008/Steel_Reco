@@ -203,6 +203,9 @@ async def _warm_trends(session) -> None:
 async def _warm_all(session):
     snaps = await _warm_summaries(session)
     await _warm_trends(session)
+    # Also warm the executive-analytics payload so the redesigned dashboard is
+    # instant on first open.
+    await _warm_analytics()
     return snaps
 
 
@@ -233,6 +236,36 @@ async def master_summary(_admin: RequireAdmin, session: ScopedSession) -> AdminM
         open_exceptions=sum(s.open_exceptions for s in summaries),
         weighted_wastage_pct=weighted,
     )
+
+
+async def _warm_analytics() -> dict:
+    """Build (or return cached) the full executive-analytics payload. Guarded
+    so concurrent admin requests don't all recompute; timeline/timestamp are
+    stamped here since the service can't call datetime at build time cheaply."""
+    cached = cache.get_analytics()
+    if cached is not None:
+        return cached
+    async with cache.analytics_lock():
+        cached = cache.get_analytics()
+        if cached is not None:
+            return cached
+        from app.services.admin_analytics_service import _recent_activity, build_admin_analytics
+
+        payload = await build_admin_analytics()
+        payload["generated_at"] = datetime.now(timezone.utc).isoformat()
+        # timeline needs the site map; rebuild a light id->name index
+        by_id = {s["project_id"]: type("S", (), {"name": s["name"]})() for s in payload["sites"]}
+        payload["timeline"] = await _recent_activity(by_id)
+        cache.put_analytics(payload)
+        return payload
+
+
+@router.get("/analytics")
+async def admin_analytics(_admin: RequireAdmin, _session: ScopedSession) -> dict:
+    """The single rich payload the executive dashboard reads -- portfolio
+    health, KPIs, insights, recommended actions, and every visualization's
+    data. Cached (TTL) and warmed at startup, so it serves in ~ms."""
+    return await _warm_analytics()
 
 
 @router.get("/sites/{project_id}/dashboard-summary", response_model=DashboardSummary)

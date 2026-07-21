@@ -342,6 +342,106 @@ export interface AdminMasterSummary {
   weighted_wastage_pct: string | null
 }
 
+// ---- Executive analytics payload (single rich call for the redesigned admin dashboard) ----
+
+export interface AnalyticsTrendPoint {
+  year: number
+  month: number
+  wastage_pct: number | null
+}
+
+export interface AnalyticsSite {
+  project_id: string
+  name: string
+  location: string | null
+  latitude: number | null
+  longitude: number | null
+  cap_pct: number
+  health: number
+  risk: "low" | "medium" | "high" | "critical"
+  received_mt: number
+  issued_mt: number
+  consumed_mt: number
+  scrap_mt: number
+  physical_mt: number
+  balance_mt: number
+  wastage_pct: number | null
+  wastage_qty_mt: number
+  over_cap: boolean
+  open_exceptions: number
+  exception_rules: Record<string, number>
+  forecast_pct: number | null
+  latest_activity: string | null
+  spark: number[]
+  trend: AnalyticsTrendPoint[]
+}
+
+export interface AnalyticsInsight {
+  severity: "info" | "warning" | "critical"
+  title: string
+  detail: string
+  project_id: string | null
+}
+
+export interface AnalyticsAction {
+  title: string
+  detail: string
+  project_id: string | null
+  priority: "high" | "medium" | "low"
+}
+
+export interface AnalyticsParetoRow {
+  name: string
+  value: number
+  cumulative_pct: number
+}
+
+export interface AnalyticsTimelineItem {
+  kind: "grn" | "issue" | "scrap" | "exception"
+  project_id: string
+  site: string
+  date: string | null
+  qty_mt: number | null
+  note: string | null
+}
+
+export interface AdminAnalytics {
+  generated_at: string | null
+  portfolio: {
+    health: number
+    wastage_pct: number | null
+    received_mt: number
+    issued_mt: number
+    consumed_mt: number
+    scrap_mt: number
+    physical_mt: number
+    wastage_qty_mt: number
+    site_count: number
+    sites_over_cap: number
+    open_exceptions: number
+  }
+  sites: AnalyticsSite[]
+  portfolio_trend: { year: number; month: number; wastage_pct: number; moving_avg: number | null }[]
+  portfolio_forecast_pct: number | null
+  insights: AnalyticsInsight[]
+  recommended_actions: AnalyticsAction[]
+  sankey: {
+    received_mt: number
+    issued_mt: number
+    consumed_mt: number
+    scrap_mt: number
+    balance_mt: number
+    physical_mt: number
+  }
+  pareto: {
+    wastage: AnalyticsParetoRow[]
+    scrap: AnalyticsParetoRow[]
+    exceptions: AnalyticsParetoRow[]
+  }
+  moving_average_note: string
+  timeline: AnalyticsTimelineItem[]
+}
+
 // ---- Abstract (sections A–N, all KG; computed, never stored) ----
 
 export interface AbstractSectionARow {

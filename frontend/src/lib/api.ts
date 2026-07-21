@@ -179,6 +179,11 @@ export async function fetchAdminMasterSummary(): Promise<import("./types").Admin
   return res.data
 }
 
+export async function fetchAdminAnalytics(): Promise<import("./types").AdminAnalytics> {
+  const res = await api.get<import("./types").AdminAnalytics>("/admin/analytics")
+  return res.data
+}
+
 export async function fetchAdminSiteSummary(
   projectId: string,
 ): Promise<import("./types").DashboardSummary> {
