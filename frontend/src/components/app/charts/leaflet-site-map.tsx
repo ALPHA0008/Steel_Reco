@@ -54,7 +54,7 @@ function FitBounds({ points }: { points: [number, number][] }) {
     if (points.length === 1) {
       map.setView(points[0], 13)
     } else {
-      map.fitBounds(points, { padding: [44, 44], maxZoom: 14 })
+      map.fitBounds(points, { padding: [50, 50], maxZoom: 15 })
     }
   }, [map, points])
   return null
@@ -87,11 +87,14 @@ export function LeafletSiteMap({
     return <div className="py-10 text-center text-[13px] text-muted-foreground">No site coordinates available.</div>
   }
 
-  const pinPx = (vol: number) => 30 + (vol / maxVol) * 22
+  const pinPx = (vol: number) => 22 + (vol / maxVol) * 10
 
   return (
     <div>
-      <div className="overflow-hidden rounded-2xl border border-border/60" style={{ height }}>
+      {/* isolate: contain Leaflet's internal pane z-indexes (200–700) inside a
+          new stacking context so they can't punch through overlays like the
+          site drawer (Radix Sheet content sits at z-50). */}
+      <div className="relative z-0 overflow-hidden rounded-2xl border border-border/60 [isolation:isolate]" style={{ height }}>
         <MapContainer
           center={points[0]}
           zoom={12}

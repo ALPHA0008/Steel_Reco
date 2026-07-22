@@ -50,20 +50,23 @@ export function SiteDrawer({
       <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-[560px]">
         {site && (
           <>
-            {/* Hero image / gradient */}
-            <div className="relative h-40 w-full overflow-hidden">
+            {/* Hero image / gradient. Note: the source marketing photos have
+                their own title text baked into the lower band, so we crop to
+                the upper portion (object-top) and lay a strong bottom-up scrim
+                so our own overlaid title reads cleanly without clashing. */}
+            <div className="relative h-44 w-full shrink-0 overflow-hidden">
               {img ? (
-                <img src={img} alt={site.name} className="h-full w-full object-cover" />
+                <img src={img} alt={site.name} className="h-full w-full object-cover object-top" />
               ) : (
-                <div className="h-full w-full bg-gradient-to-br from-foreground to-[#3d3e40]" />
+                <div className="h-full w-full bg-gradient-to-br from-brand to-[#7a0016]" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-5">
-                <span className={cn("mb-1.5 inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide", RISK_TONE[site.risk])}>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
+              <div className="absolute inset-x-0 bottom-0 p-5">
+                <span className={cn("mb-2 inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide shadow-sm", RISK_TONE[site.risk])}>
                   {site.risk} risk
                 </span>
-                <div className="font-display text-[22px] font-semibold leading-tight text-white">{site.name}</div>
-                {site.location && <div className="text-[12px] text-white/80">{site.location}</div>}
+                <div className="font-display text-[22px] font-semibold leading-tight text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.6)]">{site.name}</div>
+                {site.location && <div className="text-[12px] text-white/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">{site.location}</div>}
               </div>
             </div>
 
