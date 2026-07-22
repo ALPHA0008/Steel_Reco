@@ -302,7 +302,7 @@ function ContributionPareto({
             >
               <div className="mb-1 flex items-center justify-between text-[12px]">
                 <span className="truncate font-medium">{r.name}</span>
-                <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
+                <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cumulative</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />

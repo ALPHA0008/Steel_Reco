@@ -47,20 +47,19 @@ export function SiteDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-[560px]">
+      <SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[520px]">
         {site && (
           <>
-            {/* Hero image / gradient. Note: the source marketing photos have
-                their own title text baked into the lower band, so we crop to
-                the upper portion (object-top) and lay a strong bottom-up scrim
-                so our own overlaid title reads cleanly without clashing. */}
-            <div className="relative h-44 w-full shrink-0 overflow-hidden">
+            {/* Hero image / gradient. Source marketing photos carry their own
+                title text baked into the lower band, so we center-crop and lay a
+                strong bottom-up scrim so our overlaid title reads cleanly. */}
+            <div className="relative h-52 w-full shrink-0 overflow-hidden">
               {img ? (
-                <img src={img} alt={site.name} className="h-full w-full object-cover object-top" />
+                <img src={img} alt={site.name} className="h-full w-full object-cover object-center" />
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-brand to-[#7a0016]" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/5" />
               <div className="absolute inset-x-0 bottom-0 p-5">
                 <span className={cn("mb-2 inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide shadow-sm", RISK_TONE[site.risk])}>
                   {site.risk} risk
@@ -74,8 +73,10 @@ export function SiteDrawer({
               <SheetTitle>{site.name}</SheetTitle>
             </SheetHeader>
 
-            <div className="p-5">
-              <Tabs defaultValue="overview">
+            {/* scrollable content region — grows to fill, so the footer pins
+                to the bottom and there's no dead white space. */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5">
+              <Tabs defaultValue="overview" className="flex flex-1 flex-col">
                 <TabsList className="mb-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="flow">Material Flow</TabsTrigger>
@@ -178,7 +179,7 @@ export function SiteDrawer({
                 </TabsContent>
               </Tabs>
 
-              <div className="mt-5 flex gap-2 border-t pt-4">
+              <div className="mt-auto flex gap-2 border-t pt-4">
                 <Button asChild className="flex-1 bg-brand text-brand-foreground hover:bg-brand-hover">
                   <Link to={`/admin/sites/${site.project_id}`}>
                     <Building2 /> Open full site page
