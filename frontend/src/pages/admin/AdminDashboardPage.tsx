@@ -17,7 +17,7 @@ import { SankeyFlow } from "@/components/app/charts/sankey"
 import { ScatterChart } from "@/components/app/charts/scatter"
 import { Treemap, TreemapLegend } from "@/components/app/charts/treemap"
 import { RiskHeatmap } from "@/components/app/charts/heatmap"
-import { GeoMap } from "@/components/app/charts/geo-map"
+import { LeafletSiteMap } from "@/components/app/charts/leaflet-site-map"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
@@ -123,7 +123,7 @@ export function AdminDashboardPage() {
                 <span className="text-[11px] text-muted-foreground">click a pin to filter</span>
               </div>
               <div className="mb-3 text-[11.5px] text-muted-foreground">Real coordinates · bubble = volume · color = health</div>
-              <GeoMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
+              <LeafletSiteMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
             </Card>
           </div>
         )}
