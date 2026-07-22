@@ -1,33 +1,31 @@
-import { useMemo, useState } from "react"
-import { AlertTriangle, ArrowLeftRight, Building2, CheckCircle2, Database, Maximize2, Minimize2, PackageOpen, Recycle, X } from "lucide-react"
+import { useMemo, useState, type ReactNode } from "react"
+import { AlertTriangle, ArrowLeftRight, Building2, PackageOpen, Recycle, TriangleAlert, X } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
+import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatTile } from "@/components/app/stat-tile"
-import { BenchmarkKpi } from "@/components/app/benchmark-kpi"
 import { ExecutiveSummary } from "@/components/app/executive-summary"
-import { InsightsPanel } from "@/components/app/insights-panel"
-import { AlertsCenter } from "@/components/app/alerts-center"
-import { OperationalTimeline } from "@/components/app/timeline"
+import { IntelligenceHub } from "@/components/app/intelligence-hub"
+import { ProjectCarousel } from "@/components/app/project-carousel"
 import { CommandPalette } from "@/components/app/command-palette"
-import { CompareSites } from "@/components/app/compare-sites"
 import { SiteExplorer } from "@/pages/admin/SiteExplorer"
 import { SiteDrawer } from "@/pages/admin/SiteDrawer"
 import { FilterContext, applyFilter } from "@/pages/admin/dashboard-filter"
 import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
 import { SankeyFlow } from "@/components/app/charts/sankey"
 import { ScatterChart } from "@/components/app/charts/scatter"
-import { ContributionChart } from "@/components/app/charts/contribution"
+import { Treemap, TreemapLegend } from "@/components/app/charts/treemap"
 import { RiskHeatmap } from "@/components/app/charts/heatmap"
-import { IndiaMap } from "@/components/app/charts/india-map"
+import { GeoMap } from "@/components/app/charts/geo-map"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
 import { useAdminAnalytics } from "@/lib/queries"
 import type { AnalyticsSite } from "@/lib/types"
 
-/** A subheading for an analytics section — no heavy card chrome, just rhythm. */
-function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
+/** A subheading for a section — no heavy card chrome, just rhythm. */
+function SectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-4 flex items-baseline justify-between">
       <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{children}</h2>
@@ -37,8 +35,8 @@ function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: st
 }
 
 /** A flat analytics panel (no nested card-in-card): title + content on the
- * page surface with a hairline separator, per the depth/spacing overhaul. */
-function Panel({ title, sub, children, className }: { title: string; sub?: string; children: React.ReactNode; className?: string }) {
+ * page surface with a hairline separator. */
+function Panel({ title, sub, children, className }: { title: string; sub?: string; children: ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-2xl border border-border/50 bg-card p-5", className)}>
       <div className="mb-1 text-[13.5px] font-semibold tracking-tight">{title}</div>
@@ -59,7 +57,6 @@ export function AdminDashboardPage() {
   const [siteId, setSiteId] = useState<string | null>(null)
   const [drawerSite, setDrawerSite] = useState<AnalyticsSite | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [present, setPresent] = useState(false) // presentation mode
 
   // filtered view of the sites (identity when no filter)
   const sites = useMemo(() => applyFilter(allSites, siteId), [allSites, siteId])
@@ -72,6 +69,7 @@ export function AdminDashboardPage() {
 
   const openSiteObj = (s: AnalyticsSite) => { setDrawerSite(s); setDrawerOpen(true) }
   const openSite = (id: string) => { const s = allSites.find((x) => x.project_id === id); if (s) openSiteObj(s) }
+  const toggleFilter = (s: AnalyticsSite) => setSiteId(siteId === s.project_id ? null : s.project_id)
 
   // scoped portfolio aggregates (recompute when filtered to one site)
   const agg = useMemo(() => {
@@ -102,50 +100,31 @@ export function AdminDashboardPage() {
           title="Admin dashboard"
           description={`Company-wide operational intelligence · signed in as ${user?.full_name ?? "admin"}`}
           actions={
-            <div className="flex items-center gap-2">
-              {data && <CompareSites sites={allSites} />}
-              <button
-                type="button"
-                onClick={() => setPresent((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border bg-card px-3 py-2 text-[13px] font-semibold text-foreground shadow-sm transition-colors hover:bg-row-hover"
-                title="Presentation mode (board view)"
-              >
-                {present ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                {present ? "Exit" : "Present"}
-              </button>
-              <kbd className="hidden items-center gap-1 rounded-lg border bg-card px-2 py-1 text-[11px] font-medium text-muted-foreground shadow-sm sm:inline-flex">
-                <span className="text-[13px]">⌘</span>K
-              </kbd>
-            </div>
+            <kbd className="hidden items-center gap-1 rounded-lg border bg-card px-2 py-1 text-[11px] font-medium text-muted-foreground shadow-sm sm:inline-flex">
+              <span className="text-[13px]">⌘</span>K
+            </kbd>
           }
         />
 
-        {/* ============ Trust signals bar ============ */}
-        {data && (
-          <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border/50 bg-card px-4 py-2.5 text-[12px]">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <CheckCircle2 className="size-3.5 text-success" />
-              <span className="font-semibold text-foreground">{data.trust.reporting_sites}/{data.trust.total_sites}</span> sites reporting
-            </span>
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <Database className="size-3.5" />
-              Data completeness <span className="font-semibold text-foreground">{data.trust.data_completeness_pct}%</span>
-            </span>
-            <span className="text-muted-foreground">
-              Best performer <span className="font-semibold text-foreground">{data.benchmarks.best_site} ({data.benchmarks.best_site_pct}%)</span>
-            </span>
-            <span className="ml-auto text-muted-foreground">Source: {data.trust.source}</span>
-          </div>
-        )}
-
         {data && <CommandPalette sites={allSites} onFilterSite={setSiteId} onOpenSite={openSite} />}
 
-        {/* ============ Executive narrative hero ============ */}
+        {/* ============ Hero row: narrative (half) + site map (half) ============ */}
         {q.isLoading || !data ? (
-          <Skeleton className="mb-6 h-[260px] rounded-3xl" />
+          <div className="mb-6 grid grid-cols-2 gap-5">
+            <Skeleton className="h-[360px] rounded-3xl" />
+            <Skeleton className="h-[360px] rounded-3xl" />
+          </div>
         ) : (
-          <div className="mb-6">
-            <ExecutiveSummary n={data.narrative} generatedAt={data.generated_at} onOpenDriver={openSite} />
+          <div className="mb-6 grid grid-cols-2 items-stretch gap-5">
+            <ExecutiveSummary n={data.narrative} onOpenDriver={openSite} />
+            <Card className="gap-0 overflow-hidden p-5 shadow-(--shadow-card)">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-[13.5px] font-semibold tracking-tight">Site map</div>
+                <span className="text-[11px] text-muted-foreground">click a pin to filter</span>
+              </div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Real coordinates · bubble = volume · color = health</div>
+              <GeoMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
+            </Card>
           </div>
         )}
 
@@ -174,143 +153,165 @@ export function AdminDashboardPage() {
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="mb-8 grid grid-cols-4 gap-4">
-            <StatTile label="Received" numericValue={agg.recv} unit="MT" icon={<PackageOpen />} spark={sites.map((s) => s.received_mt)} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
+          <div className="mb-8 grid grid-cols-5 gap-4">
+            <StatTile label="Received" numericValue={agg.recv} unit="MT" icon={<PackageOpen />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
             <StatTile label="Issued" numericValue={agg.issued} unit="MT" icon={<ArrowLeftRight />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
             <StatTile label="Scrap Sold" numericValue={agg.scrap} unit="MT" icon={<Recycle />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
+            <StatTile label="Wastage" numericValue={agg.wastage ?? 0} unit="%" tone={agg.overCap > 0 ? "danger" : "success"} icon={<TriangleAlert />} format={(v) => v.toFixed(2)} />
             <StatTile label="Open Exceptions" numericValue={agg.exceptions} icon={<AlertTriangle />} tone={agg.exceptions > 0 ? "warning" : "neutral"} format={(v) => Math.round(v).toLocaleString("en-IN")} />
           </div>
         )}
 
-        {/* Wastage-with-benchmark (its own row so the benchmark track has room) */}
-        {!q.isLoading && data && (
-          <div className="mb-8 grid grid-cols-[1fr_2fr] gap-4">
-            <BenchmarkKpi
-              label={filteredSite ? `${filteredSite.name} wastage` : "Portfolio wastage"}
-              current={agg.wastage}
-              target={data.benchmarks.target_pct}
-              bestPct={data.benchmarks.best_site_pct}
-              bestSite={data.benchmarks.best_site}
-              savingsInr={data.narrative.savings_inr_per_pp}
-            />
-            <div className="rounded-2xl border border-border/50 bg-card p-5">
-              <div className="mb-1 text-[13.5px] font-semibold tracking-tight">Portfolio wastage trend & forecast</div>
-              <div className="mb-3 text-[11.5px] text-muted-foreground">Monthly mean · 3-mo moving average · next-month projection</div>
-              {data.portfolio_trend.length >= 2 ? (
-                <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
-              ) : (
-                <div className="py-8 text-center text-[13px] text-muted-foreground">Not enough history yet.</div>
-              )}
-            </div>
+        {/* ============ Project gallery (horizontal scroll, real site photos) ============ */}
+        {q.isLoading || !data ? (
+          <Skeleton className="mb-8 h-[300px] rounded-2xl" />
+        ) : (
+          <div className="mb-8">
+            <ProjectCarousel sites={allSites} onOpen={openSiteObj} />
           </div>
         )}
 
-        {/* ============ Insights + actions (hidden in presentation mode) ============ */}
-        {!present && (q.isLoading || !data ? (
-          <Skeleton className="mb-10 h-[220px] rounded-2xl" />
+        {/* ============ Intelligence hub: insights + actions + alerts + activity ============ */}
+        {q.isLoading || !data ? (
+          <Skeleton className="mb-10 h-[380px] rounded-2xl" />
         ) : (
           <div className="mb-10">
-            <InsightsPanel insights={data.insights} actions={data.recommended_actions} onOpenSite={openSite} />
+            <IntelligenceHub
+              insights={data.insights}
+              actions={data.recommended_actions}
+              sites={sites}
+              timeline={siteId ? data.timeline.filter((t) => t.project_id === siteId) : data.timeline}
+              onOpenSite={openSite}
+              onOpenSiteObj={openSiteObj}
+            />
           </div>
-        ))}
+        )}
 
-        {/* ============ Alerts + timeline (hidden in presentation mode) ============ */}
-        {!present && (q.isLoading || !data ? (
-          <Skeleton className="mb-10 h-[300px] rounded-2xl" />
+        {/* ============ Site performance explorer ============ */}
+        <SectionTitle hint="click a row for the full breakdown · click any chart element to cross-filter">Site performance</SectionTitle>
+        {q.isLoading ? (
+          <Skeleton className="mb-10 h-[360px] rounded-2xl" />
         ) : (
-          <div className="mb-10 grid grid-cols-2 gap-5">
-            <AlertsCenter sites={sites} onOpen={openSiteObj} />
-            <Panel title="Operational timeline">
-              <div className="max-h-[340px] overflow-y-auto pr-1">
-                <OperationalTimeline items={siteId ? data.timeline.filter((t) => t.project_id === siteId) : data.timeline} />
-              </div>
-            </Panel>
+          <div className="mb-10">
+            <SiteExplorer sites={allSites} onOpen={openSiteObj} activeId={siteId} onFilter={setSiteId} />
           </div>
-        ))}
-
-        {/* ============ Site performance explorer (hidden in presentation mode) ============ */}
-        {!present && (
-          <>
-            <SectionTitle hint="click a row for the full breakdown · click any chart element to cross-filter">Site performance</SectionTitle>
-            {q.isLoading ? (
-              <Skeleton className="mb-10 h-[360px] rounded-2xl" />
-            ) : (
-              <div className="mb-10">
-                <SiteExplorer sites={allSites} onOpen={openSiteObj} activeId={siteId} onFilter={setSiteId} />
-              </div>
-            )}
-          </>
         )}
 
         <SiteDrawer site={drawerSite} open={drawerOpen} onOpenChange={setDrawerOpen} />
 
-        {/* ============ Operational analytics ============ */}
+        {/* ============ Operational analytics: 5 charts, spaced to avoid crowding ============ */}
         {data && (
           <>
             <SectionTitle>Operational analytics</SectionTitle>
 
+            {/* Row 1: the two "what's the story" charts, side by side */}
             <div className="mb-5 grid grid-cols-2 gap-5">
+              <Panel title="Portfolio wastage trend & forecast" sub="Monthly mean across reporting sites · 3-mo moving average · next-month projection">
+                {data.portfolio_trend.length >= 2 ? (
+                  <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
+                ) : (
+                  <div className="py-12 text-center text-[13px] text-muted-foreground">Not enough history for a trend yet.</div>
+                )}
+              </Panel>
               <Panel title="Material flow" sub={`Received → issued → consumed → scrap (MT)${filteredSite ? ` · ${filteredSite.name}` : ""}`}>
                 <SankeyFlow received={agg.recv} issued={agg.issued} consumed={sites.reduce((a, s) => a + s.consumed_mt, 0)} scrap={agg.scrap} balance={agg.recv - sites.reduce((a, s) => a + s.consumed_mt, 0) - agg.scrap} />
               </Panel>
-              <Panel title="Decision matrix — volume vs wastage" sub="Top-right = high volume & over cap = priority · click a bubble to filter">
-                <ScatterChart sites={allSites} activeId={siteId} onOpen={(s) => setSiteId(siteId === s.project_id ? null : s.project_id)} />
+            </div>
+
+            {/* Row 2: distribution (wide) + scatter (narrower) -- the treemap needs
+                horizontal room to stay legible, so it leads a 3:2 split. */}
+            <div className="mb-5 grid grid-cols-[3fr_2fr] gap-5">
+              <Panel title="Steel distribution" sub="Share of steel volume across sites · click to filter">
+                <Treemap sites={allSites} onOpen={toggleFilter} />
+                <TreemapLegend />
+              </Panel>
+              <Panel title="Volume vs wastage" sub="Are the biggest sites the ones bleeding wastage? · click a bubble to filter">
+                <ScatterChart sites={allSites} activeId={siteId} onOpen={toggleFilter} />
               </Panel>
             </div>
 
-            <div className="mb-5 grid grid-cols-2 gap-5">
-              <Panel title="Steel distribution" sub="Share of portfolio volume by site · color = health · click to filter">
-                <ContributionChart sites={allSites} activeId={siteId} onOpen={(s) => setSiteId(siteId === s.project_id ? null : s.project_id)} />
-              </Panel>
-              <Panel title="Site map" sub="Real coordinates · bubble = volume · color = health · click to filter">
-                <IndiaMap sites={allSites} activeId={siteId} onOpen={(s) => setSiteId(siteId === s.project_id ? null : s.project_id)} />
-              </Panel>
-            </div>
-
+            {/* Row 3: heatmap alone, full width -- it needs the horizontal space
+                for 15 months and 6 sites without squeezing cells. */}
             <div className="mb-5">
               <Panel title="Risk heatmap" sub="Wastage intensity by site & month · click a site to filter">
-                <RiskHeatmap sites={allSites} onOpen={(s) => setSiteId(siteId === s.project_id ? null : s.project_id)} />
+                <RiskHeatmap sites={allSites} onOpen={toggleFilter} />
               </Panel>
             </div>
 
-            <div className={cn("grid grid-cols-3 gap-5", present && "hidden")}>
-              {([
-                { key: "wastage", title: "Wastage contribution", sub: "Which sites drive total wastage" },
-                { key: "scrap", title: "Scrap contribution", sub: "Which sites drive scrap" },
-                { key: "exceptions", title: "Exception contribution", sub: "Which sites drive open flags" },
-              ] as const).map(({ key, title, sub }) => {
-                const rows = data.pareto[key]
-                const top = rows[0]?.value || 1
-                return (
-                  <Panel key={key} title={title} sub={sub}>
-                    <div className="space-y-1.5">
-                      {rows.map((r) => {
-                        const site = allSites.find((s) => s.name === r.name)
-                        return (
-                          <button
-                            key={r.name}
-                            type="button"
-                            onClick={() => site && setSiteId(siteId === site.project_id ? null : site.project_id)}
-                            className={cn("block w-full rounded-lg p-1.5 text-left transition-colors hover:bg-row-hover", siteId && site?.project_id === siteId && "bg-brand-subtle")}
-                          >
-                            <div className="mb-1 flex items-center justify-between text-[12px]">
-                              <span className="truncate font-medium">{r.name}</span>
-                              <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
-                            </div>
-                            <div className="h-2 overflow-hidden rounded-full bg-muted">
-                              <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </Panel>
-                )
-              })}
-            </div>
+            {/* ============ Contribution panels: one Pareto card, three tabs, instead
+                of three parallel bordered boxes repeating the same layout. ============ */}
+            <SectionTitle>Portfolio contribution</SectionTitle>
+            <ContributionPareto data={data} allSites={allSites} siteId={siteId} onToggleFilter={toggleFilter} />
           </>
         )}
       </Page>
     </FilterContext.Provider>
+  )
+}
+
+type ParetoKey = "wastage" | "scrap" | "exceptions"
+const PARETO_META: Record<ParetoKey, { label: string; sub: string }> = {
+  wastage: { label: "Wastage", sub: "Which sites drive total wastage" },
+  scrap: { label: "Scrap", sub: "Which sites drive scrap" },
+  exceptions: { label: "Exceptions", sub: "Which sites drive open flags" },
+}
+
+/** The three contribution Pareto views (wastage/scrap/exceptions), consolidated
+ * into one card with a small tab switcher instead of three parallel boxes that
+ * repeat the same visual shape three times. */
+function ContributionPareto({
+  data,
+  allSites,
+  siteId,
+  onToggleFilter,
+}: {
+  data: NonNullable<ReturnType<typeof useAdminAnalytics>["data"]>
+  allSites: AnalyticsSite[]
+  siteId: string | null
+  onToggleFilter: (s: AnalyticsSite) => void
+}) {
+  const [key, setKey] = useState<ParetoKey>("wastage")
+  const rows = data.pareto[key]
+  const top = rows[0]?.value || 1
+
+  return (
+    <Panel title={`${PARETO_META[key].label} contribution`} sub={PARETO_META[key].sub}>
+      <div className="mb-4 flex gap-1.5">
+        {(Object.keys(PARETO_META) as ParetoKey[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKey(k)}
+            className={cn(
+              "rounded-full px-3 py-1 text-[12px] font-semibold transition-colors",
+              key === k ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {PARETO_META[k].label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+        {rows.map((r) => {
+          const site = allSites.find((s) => s.name === r.name)
+          return (
+            <button
+              key={r.name}
+              type="button"
+              onClick={() => site && onToggleFilter(site)}
+              className={cn("block w-full rounded-lg p-1.5 text-left transition-colors hover:bg-row-hover", siteId && site?.project_id === siteId && "bg-brand-subtle")}
+            >
+              <div className="mb-1 flex items-center justify-between text-[12px]">
+                <span className="truncate font-medium">{r.name}</span>
+                <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cum</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </Panel>
   )
 }

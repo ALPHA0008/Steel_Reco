@@ -359,37 +359,6 @@ def _narrative(sites: list[SiteFacts], portfolio_health: int,
     }
 
 
-def _benchmarks(sites: list[SiteFacts], portfolio_wastage: float | None) -> dict:
-    """Real, computable benchmarks only -- target (contract cap), best-performing
-    site (lowest real wastage), portfolio average, and the gap to target. No
-    invented 'industry average' or 'confidence %' (we have no source for those).
-    """
-    real = [s for s in sites if s.wastage_pct is not None]
-    cap = real[0].cap_pct if real else 3.0
-    best = min(real, key=lambda s: s.wastage_pct) if real else None
-    return {
-        "target_pct": cap,
-        "best_site": best.name if best else None,
-        "best_site_pct": round(best.wastage_pct, 2) if best else None,
-        "portfolio_pct": portfolio_wastage,
-        "gap_to_target_pp": round(portfolio_wastage - cap, 2) if portfolio_wastage is not None else None,
-    }
-
-
-def _trust(sites: list[SiteFacts]) -> dict:
-    """Trust signals -- all real. Data completeness = share of sites that have a
-    current wastage reading (i.e. enough ledger data to reconcile)."""
-    total = len(sites)
-    reporting = sum(1 for s in sites if s.wastage_pct is not None)
-    completeness = round(reporting / total * 100, 1) if total else 0.0
-    return {
-        "reporting_sites": reporting,
-        "total_sites": total,
-        "data_completeness_pct": completeness,
-        "source": "Reconciliation ledger (GRN / issues / JMR / physical counts)",
-    }
-
-
 # ---------------------------------------------------------------- alerts / timeline
 
 async def _recent_activity(sites_by_id: dict[str, SiteFacts], limit: int = 30) -> list[dict]:
@@ -550,8 +519,6 @@ async def build_admin_analytics() -> dict:
         },
         "sites": sites_payload,
         "narrative": _narrative(facts, portfolio_health, portfolio_wastage, pt_forecast),
-        "benchmarks": _benchmarks(facts, portfolio_wastage),
-        "trust": _trust(facts),
         "portfolio_trend": portfolio_trend,
         "portfolio_forecast_pct": pt_forecast,
         "insights": _insights(facts, healths),

@@ -440,19 +440,6 @@ export interface AdminAnalytics {
   }
   sites: AnalyticsSite[]
   narrative: AnalyticsNarrative
-  benchmarks: {
-    target_pct: number
-    best_site: string | null
-    best_site_pct: number | null
-    portfolio_pct: number | null
-    gap_to_target_pp: number | null
-  }
-  trust: {
-    reporting_sites: number
-    total_sites: number
-    data_completeness_pct: number
-    source: string
-  }
   portfolio_trend: { year: number; month: number; wastage_pct: number; moving_avg: number | null }[]
   portfolio_forecast_pct: number | null
   insights: AnalyticsInsight[]

@@ -283,3 +283,9 @@
   .ring-spin, .ring-spin-reverse, .orbit, .orbit-node, .core-pulse, .metric-float { animation: none; }
   html { scroll-behavior: auto; }
 }
+
+/* Hide scrollbars on deliberately-snap-scrollable rails (carousels) while
+   keeping them keyboard/wheel/touch scrollable -- the scroll affordance is
+   the visible arrow buttons, not a track. */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
