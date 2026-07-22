@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react"
-import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet"
+import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { MapPin } from "lucide-react"
 import type { AnalyticsSite } from "@/lib/types"
@@ -17,6 +18,34 @@ function healthLabel(h: number): string {
   return "Critical"
 }
 
+/** A teardrop map pin as an SVG divIcon. Size scales with steel volume; the
+ * head is filled with the health color, and a subtle ring pulses on the active
+ * site. The pin's tip anchors exactly on the coordinate. */
+function pinIcon(color: string, px: number, active: boolean): L.DivIcon {
+  const w = px
+  const h = Math.round(px * 1.32)
+  const pulse = active
+    ? `<circle cx="${w / 2}" cy="${w * 0.42}" r="${w * 0.5}" fill="${color}" opacity="0.25">
+         <animate attributeName="r" values="${w * 0.42};${w * 0.66};${w * 0.42}" dur="1.8s" repeatCount="indefinite"/>
+         <animate attributeName="opacity" values="0.3;0;0.3" dur="1.8s" repeatCount="indefinite"/>
+       </circle>`
+    : ""
+  const svg = `
+    <svg width="${w}" height="${h}" viewBox="0 0 40 53" xmlns="http://www.w3.org/2000/svg">
+      ${pulse ? `<g transform="scale(${40 / w})">${pulse}</g>` : ""}
+      <path d="M20 1.5C10.6 1.5 3 9.1 3 18.5c0 12 17 32 17 32s17-20 17-32C37 9.1 29.4 1.5 20 1.5Z"
+            fill="${color}" stroke="white" stroke-width="2.5"/>
+      <circle cx="20" cy="18.5" r="6.5" fill="white"/>
+    </svg>`
+  return L.divIcon({
+    html: svg,
+    className: "site-pin",
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h], // tip of the teardrop
+    tooltipAnchor: [0, -h + 6],
+  })
+}
+
 /** Recenters/refits the map whenever the site set changes (e.g. first load). */
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap()
@@ -25,7 +54,7 @@ function FitBounds({ points }: { points: [number, number][] }) {
     if (points.length === 1) {
       map.setView(points[0], 13)
     } else {
-      map.fitBounds(points, { padding: [36, 36], maxZoom: 14 })
+      map.fitBounds(points, { padding: [44, 44], maxZoom: 14 })
     }
   }, [map, points])
   return null
@@ -33,11 +62,10 @@ function FitBounds({ points }: { points: [number, number][] }) {
 
 /**
  * Real interactive map (OpenStreetMap tiles via Leaflet — no API key, no
- * billing). Every site plotted at its true lat/long; circle radius = steel
- * volume, color = health band. Popups carry the same operational figures the
- * old placeholder card did. Click a marker (or its popup) to cross-filter the
- * whole dashboard. Pan/zoom/scroll are native Leaflet — this is a genuine map,
- * not a stylised drawing.
+ * billing). Every site plotted at its true lat/long as a teardrop pin whose
+ * size = steel volume and color = health band. Popups carry the operational
+ * figures. Click a pin to cross-filter the whole dashboard. Pan/zoom/scroll
+ * are native Leaflet.
  */
 export function LeafletSiteMap({
   sites,
@@ -59,7 +87,7 @@ export function LeafletSiteMap({
     return <div className="py-10 text-center text-[13px] text-muted-foreground">No site coordinates available.</div>
   }
 
-  const radiusPx = (vol: number) => 10 + (vol / maxVol) * 16
+  const pinPx = (vol: number) => 30 + (vol / maxVol) * 22
 
   return (
     <div>
@@ -69,7 +97,7 @@ export function LeafletSiteMap({
           zoom={12}
           style={{ height: "100%", width: "100%" }}
           scrollWheelZoom={false}
-          className="[&_.leaflet-control-attribution]:text-[9px]"
+          className="[&_.leaflet-control-attribution]:text-[9px] [&_.site-pin]:!bg-transparent"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -80,19 +108,14 @@ export function LeafletSiteMap({
             const color = healthColor(s.health)
             const active = activeId === s.project_id
             return (
-              <CircleMarker
+              <Marker
                 key={s.project_id}
-                center={[s.latitude as number, s.longitude as number]}
-                radius={radiusPx(s.received_mt)}
-                pathOptions={{
-                  color,
-                  weight: active ? 3 : 1.75,
-                  fillColor: color,
-                  fillOpacity: active ? 0.55 : 0.32,
-                }}
+                position={[s.latitude as number, s.longitude as number]}
+                icon={pinIcon(color, pinPx(s.received_mt), active)}
+                zIndexOffset={active ? 1000 : 0}
                 eventHandlers={{ click: () => onOpen?.(s) }}
               >
-                <Tooltip direction="top" offset={[0, -6]} opacity={1} className="!rounded-lg !border !border-border !bg-background !px-2.5 !py-1.5 !text-[11px] !shadow-lg">
+                <Tooltip direction="top" opacity={1} className="!rounded-lg !border !border-border !bg-background !px-2.5 !py-1.5 !text-[11px] !shadow-lg">
                   <div className="mb-1 flex items-center gap-1.5 font-semibold">
                     <span className="size-2 rounded-full" style={{ background: color }} />
                     {s.name}
@@ -104,7 +127,7 @@ export function LeafletSiteMap({
                     <span>Exceptions</span><span className="text-right font-medium text-foreground">{s.open_exceptions.toLocaleString("en-IN")}</span>
                   </div>
                 </Tooltip>
-              </CircleMarker>
+              </Marker>
             )
           })}
         </MapContainer>

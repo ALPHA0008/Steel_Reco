@@ -15,7 +15,7 @@ import { FilterContext, applyFilter } from "@/pages/admin/dashboard-filter"
 import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
 import { SankeyFlow } from "@/components/app/charts/sankey"
 import { ScatterChart } from "@/components/app/charts/scatter"
-import { Treemap, TreemapLegend } from "@/components/app/charts/treemap"
+import { SteelDistributionBars } from "@/components/app/charts/steel-distribution"
 import { RiskHeatmap } from "@/components/app/charts/heatmap"
 import { LeafletSiteMap } from "@/components/app/charts/leaflet-site-map"
 import { cn } from "@/lib/utils"
@@ -221,9 +221,8 @@ export function AdminDashboardPage() {
             {/* Row 2: distribution (wide) + scatter (narrower) -- the treemap needs
                 horizontal room to stay legible, so it leads a 3:2 split. */}
             <div className="mb-5 grid grid-cols-[3fr_2fr] gap-5">
-              <Panel title="Steel distribution" sub="Share of steel volume across sites · click to filter">
-                <Treemap sites={allSites} onOpen={toggleFilter} />
-                <TreemapLegend />
+              <Panel title="Steel distribution" sub="Steel received by site · ranked · color = health · click to filter">
+                <SteelDistributionBars sites={allSites} activeId={siteId} onOpen={toggleFilter} />
               </Panel>
               <Panel title="Volume vs wastage" sub="Are the biggest sites the ones bleeding wastage? · click a bubble to filter">
                 <ScatterChart sites={allSites} activeId={siteId} onOpen={toggleFilter} />

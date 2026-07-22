@@ -385,6 +385,7 @@ export interface AnalyticsNarrative {
   driver_site: string | null
   driver_project_id: string | null
   driver_share_pct: number
+  target_wastage_pct: number
   sites_over_cap: number
   site_count: number
   headline: string
