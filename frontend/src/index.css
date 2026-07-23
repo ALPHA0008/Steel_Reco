@@ -224,6 +224,13 @@
 
   --shadow-card: var(--shadow-card);
 
+  /* Motion curves (emil-design-eng): the built-in CSS easings are too weak.
+     These give UI interactions the punch that reads as intentional. Exposed
+     as Tailwind utilities: ease-out-strong, ease-in-out-strong, ease-drawer. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
   --font-sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* Landing display face — Fraunces (variable serif). Marketing surface only;
      the in-app tool stays on Inter. */
@@ -282,8 +289,24 @@
 }
 .metric-float { animation: metric-float var(--float-dur, 9s) ease-in-out infinite; animation-delay: var(--float-delay, 0s); }
 
+/* Entrance for lists that appear as a set (e.g. the exceptions inbox). Each
+   item lifts + fades in, staggered via an inline --stagger-index, so the set
+   cascades in rather than snapping. Motion masks nothing — content is fully
+   readable the instant it lands. */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stagger-in {
+  opacity: 0;
+  animation: fade-in-up 360ms var(--ease-out-strong) forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 45ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ring-spin, .ring-spin-reverse, .orbit, .orbit-node, .core-pulse, .metric-float { animation: none; }
+  /* Reduced motion: no movement, and never leave content stuck at opacity 0. */
+  .stagger-in { animation: none; opacity: 1; }
   html { scroll-behavior: auto; }
 }
 

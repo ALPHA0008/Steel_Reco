@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, type CSSProperties } from "react"
 import { CircleCheck, TriangleAlert, OctagonAlert } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
@@ -128,13 +128,14 @@ export function ExceptionsInboxPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {rows.map((exc) => {
+          {rows.map((exc, i) => {
             const blocking = exc.severity === "blocking"
             return (
               <Card
                 key={exc.id}
+                style={{ "--stagger-index": Math.min(i, 8) } as CSSProperties}
                 className={cn(
-                  "relative overflow-hidden p-4 shadow-(--shadow-card)",
+                  "stagger-in relative overflow-hidden p-4 shadow-(--shadow-card)",
                   // Severity stripe down the left edge — the fastest scan cue.
                   "before:absolute before:inset-y-0 before:left-0 before:w-1",
                   blocking ? "before:bg-danger" : "before:bg-warning",

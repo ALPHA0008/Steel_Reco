@@ -123,7 +123,7 @@ export function ExecutiveSummary({
           disabled={!n.driver_project_id || !onOpenDriver}
           onClick={() => n.driver_project_id && onOpenDriver?.(n.driver_project_id)}
           className={cn(
-            "group flex w-full items-center gap-2.5 rounded-xl bg-foreground px-4 py-3 text-left text-background transition-all",
+            "group flex w-full items-center gap-2.5 rounded-xl bg-foreground px-4 py-3 text-left text-background transition-[transform,box-shadow] duration-150 ease-out-strong active:scale-[0.99]",
             n.driver_project_id && onOpenDriver && "hover:shadow-lg",
           )}
         >

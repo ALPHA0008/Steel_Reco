@@ -60,9 +60,9 @@ export function HowItWorks() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-60px" }}
-              className="group relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_48px_rgba(20,20,22,0.10)]"
+              className="group relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:shadow-[0_20px_48px_rgba(20,20,22,0.10)]"
             >
-              <span className="font-display inline-block text-5xl font-semibold leading-none text-brand-subtle transition-all duration-300 group-hover:-translate-y-0.5 group-hover:text-brand/25">
+              <span className="font-display inline-block text-5xl font-semibold leading-none text-brand-subtle transition-[transform,color] duration-300 ease-out-strong group-hover:-translate-y-0.5 group-hover:text-brand/25">
                 {step.num}
               </span>
               <h3 className="mt-4 text-[18px] font-semibold tracking-[-0.01em] text-foreground">{step.title}</h3>

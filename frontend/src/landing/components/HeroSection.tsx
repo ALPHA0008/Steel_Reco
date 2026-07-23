@@ -75,7 +75,7 @@ export function HeroSection() {
         <motion.div variants={rise} className="mt-12">
           <Link
             to={ctaTo}
-            className="group inline-flex h-[54px] items-center gap-2 rounded-full bg-brand px-9 text-[16px] font-semibold text-brand-foreground shadow-lg shadow-brand/20 transition-all hover:bg-brand-hover hover:shadow-xl hover:shadow-brand/25"
+            className="group inline-flex h-[54px] items-center gap-2 rounded-full bg-brand px-9 text-[16px] font-semibold text-brand-foreground shadow-lg shadow-brand/20 transition-[transform,background-color,box-shadow] duration-150 ease-out-strong active:scale-[0.98] hover:bg-brand-hover hover:shadow-xl hover:shadow-brand/25"
           >
             {ctaLabel}
             <ArrowRight className="size-[18px] transition-transform group-hover:translate-x-0.5" />

@@ -62,7 +62,7 @@ export function ProjectCarousel({
               key={s.project_id}
               type="button"
               onClick={() => onOpen(s)}
-              className="group relative aspect-[4/5] w-[240px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/50 text-left shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(20,20,22,0.16)]"
+              className="group relative aspect-[4/5] w-[240px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/50 text-left shadow-(--shadow-card) transition-[transform,box-shadow] duration-200 ease-out-strong active:scale-[0.99] hover:shadow-[0_12px_32px_rgba(20,20,22,0.16)] [@media(hover:hover)]:hover:-translate-y-0.5"
             >
               {img ? (
                 <img

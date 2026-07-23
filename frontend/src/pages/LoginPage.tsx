@@ -51,7 +51,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        <Card className="shadow-(--shadow-card)">
+        <Card className="stagger-in shadow-(--shadow-card)">
           <CardContent className="p-7">
             <h1 className="text-[19px] font-semibold tracking-tight text-foreground">Sign in</h1>
             <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>

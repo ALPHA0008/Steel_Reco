@@ -55,12 +55,12 @@ export function AccountMenu({ showName = false }: { showName?: boolean }) {
         <button
           aria-label="Account menu"
           className={cn(
-            "group flex items-center gap-2 rounded-full transition-all outline-none",
+            "group flex items-center gap-2 rounded-full transition-[transform,box-shadow] duration-150 ease-out-strong outline-none",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             showName && "border border-border bg-white/70 py-1 pr-2.5 pl-1 shadow-sm hover:shadow-md",
           )}
         >
-          <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-foreground to-[#3d3e40] text-[12.5px] font-semibold text-white shadow-sm ring-2 ring-white transition-transform group-hover:scale-[1.03]">
+          <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-foreground to-[#3d3e40] text-[12.5px] font-semibold text-white shadow-sm ring-2 ring-white transition-transform duration-150 ease-out-strong [@media(hover:hover)]:group-hover:scale-[1.03]">
             {badge}
           </span>
           {showName && (
