@@ -20,11 +20,11 @@ const tile: Variants = {
 }
 
 const tileBase =
-  "group relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:border-brand-border hover:shadow-[0_24px_56px_rgba(20,20,22,0.12)]"
+  "group relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-card to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:border-brand-border hover:shadow-[0_24px_56px_rgba(20,20,22,0.12)]"
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="relative bg-white py-24 md:py-32">
+    <section id="features" className="relative bg-card py-24 md:py-32">
       <div className="mx-auto max-w-[1200px] px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

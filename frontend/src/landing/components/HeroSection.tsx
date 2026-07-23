@@ -30,7 +30,7 @@ export function HeroSection() {
   const ctaLabel = user ? "Open dashboard" : "Get Started"
 
   return (
-    <section id="top" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white">
+    <section id="top" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background">
       <HeroBackground />
 
       <motion.div
@@ -93,7 +93,7 @@ export function HeroSection() {
         <motion.div
           animate={{ y: [0, 7, 0] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="grid size-9 place-items-center rounded-full border border-border bg-white/70 text-muted-foreground backdrop-blur"
+          className="grid size-9 place-items-center rounded-full border border-border bg-card/70 text-muted-foreground backdrop-blur"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 9l6 6 6-6" />

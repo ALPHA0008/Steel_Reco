@@ -34,7 +34,7 @@ const item: Variants = {
 
 export function HowItWorks() {
   return (
-    <section id="walkthrough" className="relative bg-white py-24 md:py-32">
+    <section id="walkthrough" className="relative bg-card py-24 md:py-32">
       <div className="mx-auto max-w-[1200px] px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -60,7 +60,7 @@ export function HowItWorks() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-60px" }}
-              className="group relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:shadow-[0_20px_48px_rgba(20,20,22,0.10)]"
+              className="group relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:shadow-[0_20px_48px_rgba(20,20,22,0.10)]"
             >
               <span className="font-display inline-block text-5xl font-semibold leading-none text-brand-subtle transition-[transform,color] duration-300 ease-out-strong group-hover:-translate-y-0.5 group-hover:text-brand/25">
                 {step.num}

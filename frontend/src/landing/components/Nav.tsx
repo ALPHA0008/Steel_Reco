@@ -43,7 +43,7 @@ export function Nav() {
     <nav
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-300 ease-out-strong",
-        scrolled ? "border-b border-border bg-white/80 shadow-sm backdrop-blur-xl" : "border-b border-transparent",
+        scrolled ? "border-b border-border bg-background/80 shadow-sm backdrop-blur-xl" : "border-b border-transparent",
       )}
     >
       <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between px-6">
@@ -90,7 +90,7 @@ export function Nav() {
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-border bg-white md:hidden">
+        <div className="border-t border-border bg-card md:hidden">
           <div className="flex flex-col gap-1 px-6 py-4">
             {NAV_LINKS.map((link) => (
               <button

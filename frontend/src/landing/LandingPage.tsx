@@ -16,7 +16,7 @@ import { Footer } from "./components/Footer"
 export default function LandingPage() {
   return (
     <SmoothScrollProvider>
-      <div className="min-h-screen bg-white font-sans antialiased">
+      <div className="min-h-screen bg-background font-sans antialiased">
         <ScrollProgress />
         <Nav />
         <HeroSection />
@@ -24,8 +24,9 @@ export default function LandingPage() {
         <AbstractShowcase />
         <HowItWorks />
         <FaqSection />
-        {/* Smooth the white → dark shift into the footer instead of a hard edge. */}
-        <div aria-hidden className="h-24 bg-gradient-to-b from-white to-foreground" />
+        {/* Smooth the page → dark-footer shift into the footer instead of a hard
+            edge. Fades from the page background to the footer's near-black. */}
+        <div aria-hidden className="h-24 bg-gradient-to-b from-background to-[#0a0a0c]" />
         <Footer />
       </div>
     </SmoothScrollProvider>

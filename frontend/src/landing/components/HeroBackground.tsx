@@ -14,16 +14,22 @@ const RED = "#ed1c24"
 
 /* ---------- Layer 1: blueprint floorplan ---------- */
 function BlueprintLayer() {
+  // text-foreground so the blueprint lines invert with the theme (dark ink on
+  // the light canvas, light ink on the dark one) instead of vanishing.
   return (
-    <svg className="absolute inset-0 h-full w-full opacity-[0.05]" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
-      <rect x="350" y="180" width="900" height="500" fill="none" stroke="#0f172a" strokeWidth="1" />
-      <line x1="800" y1="180" x2="800" y2="680" stroke="#0f172a" strokeWidth="1" />
-      <line x1="350" y1="430" x2="1250" y2="430" stroke="#0f172a" strokeWidth="1" />
-      <line x1="320" y1="180" x2="320" y2="680" stroke="#0f172a" strokeWidth="1" />
-      <line x1="312" y1="180" x2="328" y2="180" stroke="#0f172a" strokeWidth="1" />
-      <line x1="312" y1="680" x2="328" y2="680" stroke="#0f172a" strokeWidth="1" />
-      <text x="150" y="434" fontSize="13" fill="#0f172a" fontFamily="monospace">12000 mm</text>
-      <text x="360" y="205" fontSize="12" fill="#0f172a" fontFamily="monospace">TOWER 4 · SLAB L12</text>
+    <svg
+      className="absolute inset-0 h-full w-full text-foreground opacity-[0.06]"
+      viewBox="0 0 1600 900"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <rect x="350" y="180" width="900" height="500" fill="none" stroke="currentColor" strokeWidth="1" />
+      <line x1="800" y1="180" x2="800" y2="680" stroke="currentColor" strokeWidth="1" />
+      <line x1="350" y1="430" x2="1250" y2="430" stroke="currentColor" strokeWidth="1" />
+      <line x1="320" y1="180" x2="320" y2="680" stroke="currentColor" strokeWidth="1" />
+      <line x1="312" y1="180" x2="328" y2="180" stroke="currentColor" strokeWidth="1" />
+      <line x1="312" y1="680" x2="328" y2="680" stroke="currentColor" strokeWidth="1" />
+      <text x="150" y="434" fontSize="13" fill="currentColor" fontFamily="monospace">12000 mm</text>
+      <text x="360" y="205" fontSize="12" fill="currentColor" fontFamily="monospace">TOWER 4 · SLAB L12</text>
     </svg>
   )
 }
@@ -89,7 +95,7 @@ function SourceNodes() {
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-50" />
             <span className="relative inline-flex size-2 rounded-full bg-brand" />
           </span>
-          <span className="text-[9.5px] font-semibold tracking-[0.28em] text-slate-400">{s.label}</span>
+          <span className="text-[9.5px] font-semibold tracking-[0.28em] text-muted-foreground">{s.label}</span>
         </div>
       ))}
     </>
@@ -147,7 +153,7 @@ function FloatingMetrics() {
           className="metric-float absolute -translate-x-1/2 -translate-y-1/2"
           style={{ left: m.x, top: m.y, ["--float-dur" as string]: m.floatDur, ["--float-delay" as string]: m.floatDelay }}
         >
-          <div className="rounded-2xl border border-white/70 bg-white/55 px-4 py-3 shadow-[0_12px_32px_rgba(20,20,22,0.10)] backdrop-blur-xl">
+          <div className="rounded-2xl border border-border/70 bg-card/60 px-4 py-3 shadow-[0_12px_32px_rgba(20,20,22,0.10)] backdrop-blur-xl">
             <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">{m.title}</div>
             <div className="font-display mt-0.5 text-[22px] font-semibold tracking-tight text-foreground">{m.value}</div>
           </div>
@@ -166,7 +172,7 @@ function ConstructionMetadata() {
       {META.map((item, i) => (
         <div
           key={item}
-          className="absolute font-mono text-[10px] tracking-[0.4em] text-slate-400 opacity-[0.16]"
+          className="absolute font-mono text-[10px] tracking-[0.4em] text-muted-foreground opacity-[0.16]"
           style={{ left: `${10 + i * 15}%`, top: `${20 + (i % 3) * 25}%` }}
         >
           {item}
@@ -178,7 +184,7 @@ function ConstructionMetadata() {
 
 export function HeroBackground() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-white" aria-hidden>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-background" aria-hidden>
       <BlueprintLayer />
       <DataFlowLayer />
       <SourceNodes />
@@ -195,13 +201,18 @@ export function HeroBackground() {
         }}
       />
 
-      {/* Keep the busy field away from the title and the section seams. */}
+      {/* Keep the busy field away from the title and the section seams. These
+          fade to the page background, so they invert with the theme instead of
+          washing the dark canvas white. */}
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 40% 38% at 50% 45%, rgba(255,255,255,0.8) 0%, transparent 70%)" }}
+        style={{
+          background:
+            "radial-gradient(ellipse 40% 38% at 50% 45%, color-mix(in srgb, var(--background) 82%, transparent) 0%, transparent 70%)",
+        }}
       />
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white via-white/60 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white via-white/70 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background via-background/60 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background via-background/70 to-transparent" />
     </div>
   )
 }
