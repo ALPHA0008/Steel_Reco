@@ -1,5 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react"
-import { CircleCheck, TriangleAlert, OctagonAlert } from "lucide-react"
+import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import { CircleCheck, TriangleAlert, OctagonAlert, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
@@ -51,13 +51,27 @@ export function ExceptionsInboxPage() {
 
   // Blocking first, then newest first within a severity — the worst thing to
   // deal with is always at the top of the list.
-  const rows = useMemo(() => {
+  const sorted = useMemo(() => {
     const filtered = sev === "all" ? all : all.filter((e) => e.severity === sev)
     return [...filtered].sort((a, b) => {
       if (a.severity !== b.severity) return a.severity === "blocking" ? -1 : 1
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
   }, [all, sev])
+
+  // Paginate so a long inbox (100+ advisories) is scannable, worst-first.
+  const PAGE_SIZE = 20
+  const [page, setPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, pageCount)
+  const rows = useMemo(
+    () => sorted.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE),
+    [sorted, clampedPage],
+  )
+  // Any change to the filter set or tab returns to page 1.
+  useEffect(() => {
+    setPage(1)
+  }, [sev, tab])
 
   return (
     <Page>
@@ -202,6 +216,42 @@ export function ExceptionsInboxPage() {
               </Card>
             )
           })}
+
+          {/* Pagination — only when the list runs past one page. */}
+          {sorted.length > PAGE_SIZE && (
+            <div className="flex flex-col items-center justify-between gap-3 pt-1 sm:flex-row">
+              <div className="text-[12.5px] text-muted-foreground">
+                Showing{" "}
+                <span className="tnum font-medium text-foreground">
+                  {(clampedPage - 1) * PAGE_SIZE + 1}–{Math.min(clampedPage * PAGE_SIZE, sorted.length)}
+                </span>{" "}
+                of <span className="tnum font-medium text-foreground">{sorted.length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Previous page"
+                  disabled={clampedPage <= 1}
+                  onClick={() => setPage(clampedPage - 1)}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <span className="tnum px-2 text-[12.5px] text-muted-foreground">
+                  Page {clampedPage} of {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Next page"
+                  disabled={clampedPage >= pageCount}
+                  onClick={() => setPage(clampedPage + 1)}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

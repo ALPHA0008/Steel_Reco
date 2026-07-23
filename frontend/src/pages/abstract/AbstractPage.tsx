@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { ReconciliationFlow } from "./reconciliation-flow"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -121,6 +122,16 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
   return { rows, dias }
 }
 
+/** Which of the four narrative bands each row belongs to. Turns 14 undifferentiated
+ *  stripes into a readable structure: what came in, what went out/used, what's
+ *  left, and the result. */
+const BAND_OF: Record<string, string> = {
+  A: "Inbound", B: "Inbound", C: "Inbound",
+  D: "Issued & consumed", E: "Issued & consumed", F: "Issued & consumed", G: "Issued & consumed",
+  H: "Stock", I: "Stock", J: "Stock", K: "Stock",
+  L: "Reconciliation", M: "Reconciliation", N: "Reconciliation",
+}
+
 function fmt(kg: number | undefined, unit: "kg" | "mt"): string {
   if (kg === undefined || kg === 0) return "—"
   const v = unit === "mt" ? kg / 1000 : kg
@@ -231,6 +242,17 @@ export function AbstractPage() {
   const periodLabel = `${MONTH_NAMES[month - 1]} ${year}`
   const scrapKg = abstract.data ? parseFloat(abstract.data.section_n_scrap_sold_kg) : 0
 
+  // Anchor totals for the flow strip — summed straight off the built rows so
+  // they always match the matrix. C = net received, G = consumed+WIP,
+  // K = total physical, L = wastage qty, M = wastage %.
+  const rowTotal = (code: string) => {
+    const r = built?.rows.find((x) => x.code === code)
+    if (!r) return 0
+    return Object.values(r.values).reduce((s, v) => s + v, 0)
+  }
+  const wastagePct =
+    abstract.data?.section_m_wastage_pct == null ? null : parseFloat(abstract.data.section_m_wastage_pct)
+
   return (
     <Page>
       <PageHeader
@@ -308,6 +330,20 @@ export function AbstractPage() {
         </Banner>
       ))}
 
+      {built && (
+        <ReconciliationFlow
+          netReceivedKg={rowTotal("C")}
+          consumedWipKg={rowTotal("G")}
+          physicalKg={rowTotal("K")}
+          wastageKg={rowTotal("L")}
+          wastagePct={wastagePct}
+          capPct={capPct}
+          scrapKg={scrapKg}
+          unit={unit}
+          fmt={fmt}
+        />
+      )}
+
       <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
         {abstract.isLoading || !built ? (
           <div className="space-y-2 p-5">
@@ -345,8 +381,10 @@ export function AbstractPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {built.rows.map((row) => {
+                  {built.rows.map((row, idx) => {
                     const total = Object.values(row.values).reduce((s, v) => s + v, 0)
+                    const band = BAND_OF[row.code]
+                    const bandStart = idx === 0 || BAND_OF[built.rows[idx - 1].code] !== band
                     const label = (
                       <span className={cn("font-medium", row.computed && "text-info")}>
                         {row.code} · {row.label}
@@ -356,8 +394,18 @@ export function AbstractPage() {
                       </span>
                     )
                     return (
+                      <Fragment key={row.code}>
+                      {bandStart && (
+                        <tr className="bg-background">
+                          <td
+                            colSpan={built.dias.length + 2}
+                            className="sticky left-0 h-7 border-b border-t px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70"
+                          >
+                            {band}
+                          </td>
+                        </tr>
+                      )}
                       <tr
-                        key={row.code}
                         className={cn(
                           "transition-colors odd:bg-row-stripe hover:bg-row-hover",
                           row.danger && "bg-danger-subtle font-semibold text-danger odd:bg-danger-subtle hover:bg-danger-subtle",
@@ -377,11 +425,27 @@ export function AbstractPage() {
                             label
                           )}
                         </td>
-                        {built.dias.map((d) => (
-                          <td key={d} className="tnum h-9 border-b px-4 text-right">
-                            {row.scalar !== undefined ? "—" : fmt(row.values[d], unit)}
-                          </td>
-                        ))}
+                        {built.dias.map((d) => {
+                          // Wastage row (L): tint each cell by how much of the
+                          // total wastage sits in that diameter, so the worst
+                          // offenders pop without reading every number.
+                          const v = row.values[d]
+                          const isL = row.code === "L"
+                          const share = isL && total > 0 && v != null && v > 0 ? v / total : 0
+                          return (
+                            <td
+                              key={d}
+                              className="tnum relative h-9 border-b px-4 text-right"
+                              style={
+                                isL && share > 0
+                                  ? { background: `color-mix(in srgb, var(--warning) ${Math.round(share * 55)}%, transparent)` }
+                                  : undefined
+                              }
+                            >
+                              {row.scalar !== undefined ? "—" : fmt(row.values[d], unit)}
+                            </td>
+                          )
+                        })}
                         <td className={cn("tnum sticky right-0 z-10 h-9 border-b bg-row-pinned px-4 text-right font-semibold", row.danger && "bg-danger-subtle text-danger")}>
                           {row.code === "M"
                             ? row.scalar
@@ -390,6 +454,7 @@ export function AbstractPage() {
                               : fmt(total, unit)}
                         </td>
                       </tr>
+                      </Fragment>
                     )
                   })}
                 </tbody>
