@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import { FileText, Plus } from "lucide-react"
@@ -30,7 +31,7 @@ export function PurchaseOrderListPage() {
     {
       key: "date",
       header: "Order date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.order_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.order_date)}</span>,
     },
     {
       key: "qty",

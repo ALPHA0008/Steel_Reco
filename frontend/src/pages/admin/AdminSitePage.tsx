@@ -59,7 +59,7 @@ export function AdminSitePage() {
         </Banner>
       )}
 
-      <div className="mb-5 grid grid-cols-4 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {summary.isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
         ) : summary.data ? (

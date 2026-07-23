@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth"
+import { formatDateTime } from "@/lib/format"
 import {
   apiErrorMessage,
   deactivateAdminUser,
@@ -21,7 +22,7 @@ import {
 
 function formatDate(iso: string | null): string {
   if (!iso) return "Never"
-  return new Date(iso).toLocaleString()
+  return formatDateTime(iso)
 }
 
 /**

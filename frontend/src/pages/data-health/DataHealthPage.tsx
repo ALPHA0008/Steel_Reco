@@ -46,7 +46,7 @@ export function DataHealthPage() {
       )}
 
       {health.data && (
-        <div className="mb-5 grid grid-cols-3 gap-4">
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card className="shadow-(--shadow-card)">
             <CardContent className="pt-5">
               <div className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">

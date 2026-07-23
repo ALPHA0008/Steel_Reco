@@ -103,8 +103,8 @@
   --accent: #2a2a2c;
   --accent-foreground: #eae7e9;
 
-  --destructive: #ff9b91;
-  --destructive-foreground: #2e1613;
+  --destructive: #ff5449;
+  --destructive-foreground: #2e0b08;
 
   --border: #2c2c2e;
   --input: #3a393b;
@@ -126,9 +126,12 @@
   --warning: #f2a64d;
   --warning-subtle: #2a2010;
   --warning-border: #4c3a18;
-  --danger: #ff9b91;
-  --danger-subtle: #2e1613;
-  --danger-border: #5a2a26;
+  /* Danger stays a real alarm in the dark, not a pastel: a saturated red that
+     still clears ~4.5:1 as text on the #161718 background AND reads urgent as
+     a fill/bar. The old #ff9b91 whispered; over-cap wastage must shout. */
+  --danger: #ff5449;
+  --danger-subtle: #33110d;
+  --danger-border: #7a2a24;
 
   --row-stripe: #1e1f20;
   --row-hover: #2a2a2c;
@@ -146,7 +149,7 @@
   --sidebar-border: #2c2c2e;
   --sidebar-ring: #ff6564;
 
-  --chart-1: #ff9b91;
+  --chart-1: #ff5449;
   --chart-2: #8dbaea;
   --chart-3: #69ca7e;
   --chart-4: #f2a64d;

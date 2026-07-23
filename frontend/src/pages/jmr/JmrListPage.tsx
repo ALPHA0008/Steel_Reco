@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ClipboardCheck, Pencil, Plus } from "lucide-react"
@@ -36,7 +37,7 @@ export function JmrListPage() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.effective_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.effective_date)}</span>,
     },
     { key: "tower", header: "Tower", render: (r) => towerById.get(r.tower_id)?.name ?? "—" },
     { key: "pour", header: "Pour no.", render: (r) => r.pour_number ?? "—" },

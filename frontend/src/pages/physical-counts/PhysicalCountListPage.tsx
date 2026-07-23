@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import { Grid3x3, Plus } from "lucide-react"
@@ -27,7 +28,7 @@ export function PhysicalCountListPage() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.effective_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.effective_date)}</span>,
     },
     {
       key: "contractor",

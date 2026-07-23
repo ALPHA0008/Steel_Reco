@@ -110,12 +110,12 @@ export function AdminDashboardPage() {
 
         {/* ============ Hero row: narrative (half) + site map (half) ============ */}
         {q.isLoading || !data ? (
-          <div className="mb-6 grid grid-cols-2 gap-5">
+          <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Skeleton className="h-[360px] rounded-3xl" />
             <Skeleton className="h-[360px] rounded-3xl" />
           </div>
         ) : (
-          <div className="mb-6 grid grid-cols-2 items-stretch gap-5">
+          <div className="mb-6 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
             <ExecutiveSummary n={data.narrative} onOpenDriver={openSite} />
             <Card className="gap-0 overflow-hidden p-5 shadow-(--shadow-card)">
               <div className="mb-1 flex items-center justify-between">
@@ -130,13 +130,13 @@ export function AdminDashboardPage() {
 
         {/* ============ Active filter bar ============ */}
         {filteredSite && (
-          <div className="mb-5 flex items-center gap-2 rounded-xl border border-brand-border bg-brand-subtle px-4 py-2.5">
+          <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-brand-border bg-brand-subtle px-4 py-2.5">
             <span className="text-[12px] font-medium text-brand-text">Filtered to</span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-[12.5px] font-semibold text-foreground shadow-sm">
               <Building2 className="size-3.5 text-brand-text" />
               {filteredSite.name}
             </span>
-            <span className="text-[12px] text-muted-foreground">— every metric below reflects this site only.</span>
+            <span className="hidden text-[12px] text-muted-foreground sm:inline">— every metric below reflects this site only.</span>
             <button
               type="button"
               onClick={() => setSiteId(null)}
@@ -149,11 +149,11 @@ export function AdminDashboardPage() {
 
         {/* ============ KPI strip (scoped) ============ */}
         {q.isLoading || !data ? (
-          <div className="mb-8 grid grid-cols-5 gap-4">
+          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="mb-8 grid grid-cols-5 gap-4">
+          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <StatTile label="Received" numericValue={agg.recv} unit="MT" icon={<PackageOpen />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
             <StatTile label="Issued" numericValue={agg.issued} unit="MT" icon={<ArrowLeftRight />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
             <StatTile label="Scrap Sold" numericValue={agg.scrap} unit="MT" icon={<Recycle />} format={(v) => v.toLocaleString("en-IN", { maximumFractionDigits: 0 })} />
@@ -205,7 +205,7 @@ export function AdminDashboardPage() {
             <SectionTitle>Operational analytics</SectionTitle>
 
             {/* Row 1: the two "what's the story" charts, side by side */}
-            <div className="mb-5 grid grid-cols-2 gap-5">
+            <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
               <Panel title="Portfolio wastage trend & forecast" sub="Monthly mean across reporting sites · 3-mo moving average · next-month projection">
                 {data.portfolio_trend.length >= 2 ? (
                   <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
@@ -220,7 +220,7 @@ export function AdminDashboardPage() {
 
             {/* Row 2: distribution (wide) + scatter (narrower) -- the treemap needs
                 horizontal room to stay legible, so it leads a 3:2 split. */}
-            <div className="mb-5 grid grid-cols-[3fr_2fr] gap-5">
+            <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
               <Panel title="Steel distribution" sub="Steel received by site · ranked · color = health · click to filter">
                 <SteelDistributionBars sites={allSites} activeId={siteId} onOpen={toggleFilter} />
               </Panel>

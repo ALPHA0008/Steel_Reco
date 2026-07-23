@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { PackageOpen, Plus } from "lucide-react"
@@ -25,8 +26,8 @@ const poSummaryColumns: Column<GrnPoSummaryRow>[] = [
   { key: "po_reference", header: "PO reference", render: (r) => <span className="tnum">{r.po_reference}</span> },
   { key: "count", header: "Receipts", numeric: true, render: (r) => r.grn_count },
   { key: "total", header: "Total (kg)", numeric: true, render: (r) => formatKg(r.total_kg) },
-  { key: "first", header: "First receipt", render: (r) => <span className="tnum text-muted-foreground">{r.first_date}</span> },
-  { key: "last", header: "Last receipt", render: (r) => <span className="tnum text-muted-foreground">{r.last_date}</span> },
+  { key: "first", header: "First receipt", render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.first_date)}</span> },
+  { key: "last", header: "Last receipt", render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.last_date)}</span> },
   {
     key: "linked",
     header: "Linked to real PO",
@@ -58,7 +59,7 @@ export function GrnListPage() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.effective_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.effective_date)}</span>,
     },
     { key: "vendor", header: "Vendor", render: (r) => vendorById.get(r.vendor_id)?.name ?? "—" },
     { key: "dia", header: "Dia", render: (r) => diaLabel(diaById.get(r.dia_grade_id)) },

@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { Link } from "react-router-dom"
 import { Plus, Recycle } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
@@ -21,7 +22,7 @@ export function ScrapListPage() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.effective_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.effective_date)}</span>,
     },
     { key: "buyer", header: "Buyer", render: (r) => r.buyer_name },
     { key: "kg", header: "Weight (kg)", numeric: true, render: (r) => formatKg(r.weight_kg) },

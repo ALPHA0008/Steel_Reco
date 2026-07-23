@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
+import { formatDate } from "@/lib/format"
 import { KpiCard } from "@/components/app/kpi"
 import { EmptyState } from "@/components/app/empty-state"
 import { Banner } from "@/components/app/banner"
@@ -75,7 +76,7 @@ export function DashboardPage() {
         </Banner>
       )}
 
-      <div className="mb-5 grid grid-cols-4 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {summary.isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
         ) : summary.data ? (
@@ -120,7 +121,7 @@ export function DashboardPage() {
         ) : null}
       </div>
 
-      <div className="mb-5 grid grid-cols-[1.4fr_1fr] gap-4">
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="py-0 shadow-(--shadow-card)">
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="text-[15px] font-semibold tracking-tight">Recent GRNs</h2>
@@ -136,7 +137,7 @@ export function DashboardPage() {
             <ul className="divide-y">
               {recentGrns.map((g) => (
                 <li key={g.id} className="flex items-center gap-3 px-5 py-2.5 text-[13px]">
-                  <span className="tnum text-muted-foreground">{g.effective_date}</span>
+                  <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(g.effective_date)}</span>
                   <span className="font-medium">{vendorById.get(g.vendor_id)?.name ?? "—"}</span>
                   <span className="text-muted-foreground">{diaLabel(diaById.get(g.dia_grade_id))}</span>
                   <span className="tnum ml-auto font-semibold">{formatKg(g.weighbridge_weight_kg)} kg</span>
@@ -161,7 +162,7 @@ export function DashboardPage() {
             <ul className="divide-y">
               {recentIssues.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-5 py-2.5 text-[13px]">
-                  <span className="tnum text-muted-foreground">{i.effective_date}</span>
+                  <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(i.effective_date)}</span>
                   <span className="text-muted-foreground">{diaLabel(diaById.get(i.dia_grade_id))}</span>
                   <span className="tnum ml-auto font-semibold">
                     {i.direction === "in" ? "−" : ""}

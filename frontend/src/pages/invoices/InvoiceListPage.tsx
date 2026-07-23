@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format"
 import { useMemo } from "react"
 import { Link } from "react-router-dom"
 import { Plus, Receipt } from "lucide-react"
@@ -25,7 +26,7 @@ export function InvoiceListPage() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.invoice_date}</span>,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.invoice_date)}</span>,
     },
     {
       key: "qty",

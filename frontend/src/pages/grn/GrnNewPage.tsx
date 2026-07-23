@@ -242,7 +242,7 @@ export function GrnNewPage() {
                 Leave blank if the document isn't available yet — the GRN still saves, flagged for follow-up.
               </p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field
                   label="Purchase order"
                   render={(p) => (
@@ -301,7 +301,7 @@ export function GrnNewPage() {
 
             <div>
               <h3 className="mb-3 text-sm font-semibold">Weighing</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field
                   label="Gross weight (kg)"
                   description="From the weighbridge slip."
