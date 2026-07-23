@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react"
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
-import { MapPin } from "lucide-react"
 import type { AnalyticsSite } from "@/lib/types"
 
 function healthColor(h: number): string {
@@ -79,7 +78,6 @@ export function LeafletSiteMap({
   onOpen?: (s: AnalyticsSite) => void
 }) {
   const geo = useMemo(() => sites.filter((s) => s.latitude != null && s.longitude != null), [sites])
-  const noGeo = sites.filter((s) => s.latitude == null || s.longitude == null)
   const maxVol = Math.max(1, ...geo.map((s) => s.received_mt))
   const points = useMemo<[number, number][]>(() => geo.map((s) => [s.latitude as number, s.longitude as number]), [geo])
 
@@ -135,12 +133,6 @@ export function LeafletSiteMap({
           })}
         </MapContainer>
       </div>
-      {noGeo.length > 0 && (
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <MapPin className="size-3.5" />
-          No coordinates yet: {noGeo.map((s) => s.name).join(", ")}
-        </div>
-      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useRef, type CSSProperties } from "react"
 import { Building2, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { siteImage } from "@/lib/site-images"
@@ -55,14 +55,15 @@ export function ProjectCarousel({
         className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
         style={{ scrollbarWidth: "none" }}
       >
-        {sites.map((s) => {
+        {sites.map((s, i) => {
           const img = siteImage(s.name)
           return (
             <button
               key={s.project_id}
               type="button"
               onClick={() => onOpen(s)}
-              className="group relative aspect-[4/5] w-[240px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/50 text-left shadow-(--shadow-card) transition-[transform,box-shadow] duration-200 ease-out-strong active:scale-[0.99] hover:shadow-[0_12px_32px_rgba(20,20,22,0.16)] [@media(hover:hover)]:hover:-translate-y-0.5"
+              style={{ "--stagger-index": Math.min(i, 8) } as CSSProperties}
+              className="stagger-in group relative aspect-[4/5] w-[240px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border/50 text-left shadow-(--shadow-card) transition-[transform,box-shadow] duration-200 ease-out-strong active:scale-[0.99] hover:shadow-[0_12px_32px_rgba(20,20,22,0.16)] [@media(hover:hover)]:hover:-translate-y-0.5"
             >
               {img ? (
                 <img

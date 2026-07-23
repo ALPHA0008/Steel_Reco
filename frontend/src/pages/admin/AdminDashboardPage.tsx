@@ -122,7 +122,7 @@ export function AdminDashboardPage() {
                 <div className="text-[13.5px] font-semibold tracking-tight">Site map</div>
                 <span className="text-[11px] text-muted-foreground">click a pin to filter</span>
               </div>
-              <div className="mb-3 text-[11.5px] text-muted-foreground">Real coordinates · bubble = volume · color = health</div>
+              <div className="mb-3 text-[11.5px] text-muted-foreground">Real coordinates</div>
               <LeafletSiteMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
             </Card>
           </div>
@@ -224,7 +224,7 @@ export function AdminDashboardPage() {
               <Panel title="Steel distribution" sub="Steel received by site · ranked · color = health · click to filter">
                 <SteelDistributionBars sites={allSites} activeId={siteId} onOpen={toggleFilter} />
               </Panel>
-              <Panel title="Volume vs wastage" sub="Are the biggest sites the ones bleeding wastage? · click a bubble to filter">
+              <Panel title="Volume vs wastage" sub="click a bubble to filter">
                 <ScatterChart sites={allSites} activeId={siteId} onOpen={toggleFilter} />
               </Panel>
             </div>
