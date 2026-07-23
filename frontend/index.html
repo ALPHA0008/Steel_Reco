@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Digi Reco — My Home Group</title>
     <script>
-      // Force light mode — dark mode is not supported in v1.
-      // Remove any stale "dark" class from prior visits or OS preference.
+      // Resolve the theme BEFORE first paint so there is no light/dark flash.
+      // Stored preference is "light" | "dark" | "system" (default "system").
       try {
-        document.documentElement.classList.remove("dark");
-        localStorage.removeItem("theme");
+        var pref = localStorage.getItem("theme") || "system";
+        var isDark =
+          pref === "dark" ||
+          (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.classList.toggle("dark", isDark);
+        root.setAttribute("data-theme", isDark ? "dark" : "light");
       } catch {}
     </script>
   </head>

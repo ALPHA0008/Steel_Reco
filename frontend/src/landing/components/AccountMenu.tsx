@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom"
-import { ChevronDown, LayoutDashboard, LogOut, Table2, TriangleAlert, Users } from "lucide-react"
+import { ChevronDown, LayoutDashboard, LogOut, Monitor, Moon, Sun, Table2, TriangleAlert, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
+import { useTheme, type ThemePref } from "@/lib/theme"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,53 @@ const ADMIN_QUICK_LINKS = [
  * Shared by the landing nav and the in-app header so account UX is identical
  * everywhere.
  */
+const THEME_OPTIONS: { value: ThemePref; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "system", label: "System", icon: Monitor },
+  { value: "dark", label: "Dark", icon: Moon },
+]
+
+/** Segmented Light / System / Dark control — the theme setting lives here. */
+function ThemeSegment() {
+  const { theme, setTheme } = useTheme()
+  return (
+    <div className="px-2 py-1.5">
+      <div className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Theme</div>
+      <div
+        role="radiogroup"
+        aria-label="Theme"
+        className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+      >
+        {THEME_OPTIONS.map((opt) => {
+          const active = theme === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={(e) => {
+                e.preventDefault()
+                setTheme(opt.value)
+              }}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[12px] font-medium transition-colors duration-150 ease-out-strong",
+                "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                active
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <opt.icon className="size-3.5" strokeWidth={1.8} />
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function AccountMenu({ showName = false }: { showName?: boolean }) {
   const { user, logout } = useAuth()
   if (!user) return null
@@ -106,6 +154,13 @@ export function AccountMenu({ showName = false }: { showName?: boolean }) {
             </Link>
           </DropdownMenuItem>
         ))}
+
+        <DropdownMenuSeparator />
+
+        {/* Theme — kept open on click so the user can preview options live. */}
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <ThemeSegment />
+        </div>
 
         <DropdownMenuSeparator />
 
