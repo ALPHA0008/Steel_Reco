@@ -18,7 +18,7 @@ function BlueprintLayer() {
   // the light canvas, light ink on the dark one) instead of vanishing.
   return (
     <svg
-      className="absolute inset-0 h-full w-full text-foreground opacity-[0.06]"
+      className="absolute inset-0 h-full w-full text-foreground opacity-[0.07] dark:opacity-[0.16]"
       viewBox="0 0 1600 900"
       preserveAspectRatio="xMidYMid slice"
     >
@@ -49,9 +49,15 @@ const SOURCES = [
 const CORE = { x: 800, y: 405 }
 
 function DataFlowLayer() {
+  // Intake curves in the info-blue token via currentColor, so they hold up on
+  // both grounds (a fixed dark-blue washed out on the dark canvas).
   return (
-    <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
-      <g opacity="0.55">
+    <svg
+      className="absolute inset-0 h-full w-full text-info opacity-30 dark:opacity-50"
+      viewBox="0 0 1600 900"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <g>
         {SOURCES.map((s) => {
           const sx = s.x * 16
           const sy = s.y * 9
@@ -64,7 +70,7 @@ function DataFlowLayer() {
               id={`flow-${s.id}`}
               d={`M ${sx} ${sy} Q ${cx} ${cy} ${CORE.x} ${CORE.y}`}
               fill="none"
-              stroke="rgba(42,90,133,0.20)"
+              stroke="currentColor"
               strokeWidth="1"
             />
           )
@@ -172,7 +178,7 @@ function ConstructionMetadata() {
       {META.map((item, i) => (
         <div
           key={item}
-          className="absolute font-mono text-[10px] tracking-[0.4em] text-muted-foreground opacity-[0.16]"
+          className="absolute font-mono text-[10px] tracking-[0.4em] text-muted-foreground opacity-[0.22] dark:opacity-40"
           style={{ left: `${10 + i * 15}%`, top: `${20 + (i % 3) * 25}%` }}
         >
           {item}
