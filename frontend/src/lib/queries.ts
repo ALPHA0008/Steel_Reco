@@ -17,6 +17,8 @@ import type {
   DiaGrade,
   Element,
   DataHealthResponse,
+  DraftAbstractRequest,
+  DraftAbstractResponse,
   ExceptionLog,
   ExceptionResolutionType,
   Floor,
@@ -29,6 +31,8 @@ import type {
   JmrActualCreate,
   PeriodBounds,
   WastageTrendResponse,
+  MyHomeStock,
+  MyHomeStockCreate,
   PhysicalCount,
   PhysicalCountCreate,
   Project,
@@ -186,6 +190,10 @@ const pcHooks = makeHooks<PhysicalCount, PhysicalCountCreate>("physical-counts",
 export const usePhysicalCounts = pcHooks.useList
 export const useCreatePhysicalCount = pcHooks.useCreate
 
+const myhomeStockHooks = makeHooks<MyHomeStock, MyHomeStockCreate>("myhome-stock", "/myhome-stock")
+export const useMyHomeStock = myhomeStockHooks.useList
+export const useCreateMyHomeStock = myhomeStockHooks.useCreate
+
 const scrapHooks = makeHooks<ScrapSale, ScrapSaleCreate>("scrap-sales", "/scrap-sales")
 export const useScrapSales = scrapHooks.useList
 export const useCreateScrapSale = scrapHooks.useCreate
@@ -255,6 +263,15 @@ export function usePeriodBounds() {
     queryKey: ["abstract-period-bounds"],
     queryFn: async () => (await api.get<PeriodBounds>("/abstract/period-bounds")).data,
     staleTime: MASTERS_STALE,
+  })
+}
+
+/** Quick Draft: type A-N per diameter, get the same derived math + finding
+ * rules the real Abstract runs -- a stateless POST, nothing is ever saved. */
+export function useDraftAbstract() {
+  return useMutation({
+    mutationFn: async (payload: DraftAbstractRequest) =>
+      (await api.post<DraftAbstractResponse>("/abstract/draft", payload)).data,
   })
 }
 

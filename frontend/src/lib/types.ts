@@ -262,6 +262,24 @@ export interface PhysicalCount {
   cut_pieces: Array<CutPieceCreate & { id: string }>
 }
 
+// ---- MyHome Stock (steel at My Home's own yard, not a contractor's) ----
+
+export interface MyHomeStockCreate {
+  dia_grade_id: string
+  qty_kg: string
+  effective_date: string
+  notes?: string | null
+}
+
+export interface MyHomeStock extends Omit<MyHomeStockCreate, "notes"> {
+  id: string
+  project_id: string
+  notes: string | null
+  corrected_from_id: string | null
+  created_by: string
+  created_at: string
+}
+
 // ---- Scrap ----
 
 export interface ScrapSaleCreate {
@@ -507,6 +525,7 @@ export interface AbstractSectionIJRow {
   full_length_kg: string | null
   cut_piece_stock_kg: string | null
   cut_piece_scrap_kg: string | null
+  safety_steel_kg: string | null
   total_physical_kg: string | null
 }
 
@@ -571,6 +590,7 @@ export interface AbstractResponse {
   section_g_consumption_plus_wip: Record<string, string>
   section_h_theoretical_stock: Record<string, string>
   sections_ij_physical_stock: AbstractSectionIJRow[]
+  section_myhome_stock: Record<string, string>
   section_k_total_physical: Record<string, string>
   section_l_wastage_qty: Record<string, string>
   section_m_wastage_pct: string | null
@@ -588,6 +608,35 @@ export interface AbstractFinding {
   actual_kg: string
   threshold_kg: string
   message: string
+}
+
+/** Quick Draft: type A/B/D/E/F/I/J/MyHome/N per diameter, get the derived
+ * C/G/H/K/L/M and the same class of plausibility checks the real Abstract
+ * runs. Nothing here is ever saved -- a scratch calculation. */
+export interface DraftAbstractRequest {
+  period_label: string
+  cap_pct: string
+  section_a_received: Record<string, string>
+  section_b_transferred: Record<string, string>
+  section_d_issued: Record<string, string>
+  section_e_consumption: Record<string, string>
+  section_f_wip: Record<string, string>
+  section_i_physical_full_length: Record<string, string>
+  section_j_physical_cut_pieces: Record<string, string>
+  section_myhome_stock: Record<string, string>
+  section_n_scrap_sold_kg: string
+}
+
+export interface DraftAbstractResponse {
+  is_draft: true
+  period_label: string
+  section_c_net_received: Record<string, string>
+  section_g_consumption_plus_wip: Record<string, string>
+  section_h_theoretical_stock: Record<string, string>
+  section_k_total_physical: Record<string, string>
+  section_l_wastage_qty: Record<string, string>
+  section_m_wastage_pct: string | null
+  findings: AbstractFinding[]
 }
 
 export interface FinalizeResponse {

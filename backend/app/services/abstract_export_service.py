@@ -55,13 +55,14 @@ class AbstractExportService:
             dia = str(row["dia"])
             I_[dia] = I_.get(dia, 0.0) + float(row.get("full_length_kg") or 0)
             J[dia] = J.get(dia, 0.0) + float(row.get("cut_piece_stock_kg") or 0)
+        MyHome = {k: float(v) for k, v in a.section_myhome_stock.items()}
         K = {k: float(v) for k, v in a.section_k_total_physical.items()}
         L = {k: float(v) for k, v in a.section_l_wastage_qty.items()}
         m_pct = float(a.section_m_wastage_pct) if a.section_m_wastage_pct is not None else None
         n_kg = float(a.section_n_scrap_sold_kg)
 
         dias = sorted(
-            {d for m in (A, B, C, D, E, F, G, H, I_, J, K, L) for d in m},
+            {d for m in (A, B, C, D, E, F, G, H, I_, J, MyHome, K, L) for d in m},
             key=lambda x: float(x),
         )
 
@@ -69,6 +70,7 @@ class AbstractExportService:
             ("A", "Received", A, False, None),
             ("B", "Transferred out", B, False, None),
             ("C", "Net Received", C, True, "= A - B"),
+            ("C1", "Stock at My Home", MyHome, False, "steel at My Home's own yard"),
             ("D", "Issued to Contractor", D, False, "genuine sum, never = C"),
             ("E", "Consumption", E, False, None),
             ("F", "Work in Progress", F, False, None),
@@ -76,7 +78,7 @@ class AbstractExportService:
             ("H", "Theoretical Stock", H, True, "= C - G"),
             ("I", "Physical — Full length", I_, False, None),
             ("J", "Physical — Cut pieces (stock)", J, False, None),
-            ("K", "Total Physical", K, True, "= I + J"),
+            ("K", "Total Physical", K, True, "= I + J + Stock at My Home"),
             ("L", "Wastage Qty", L, True, "= H - K"),
         ]
 

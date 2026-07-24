@@ -228,7 +228,12 @@ class AbstractRepository:
                            ), 0) AS cut_piece_stock_kg,
                            COALESCE(SUM(cp.nos * cp.weight_kg) FILTER (
                                WHERE cp.classification = 'scrap'
-                           ), 0) AS cut_piece_scrap_kg
+                           ), 0) AS cut_piece_scrap_kg,
+                           -- Breakout only (display), already counted inside
+                           -- cut_piece_stock_kg above -- never double-add this.
+                           COALESCE(SUM(cp.nos * cp.weight_kg) FILTER (
+                               WHERE cp.classification = 'used_as_safety_steel'
+                           ), 0) AS safety_steel_kg
                     FROM latest l
                     LEFT JOIN physical_count_cut_piece cp ON cp.physical_count_id = l.id
                     GROUP BY l.id
@@ -237,6 +242,7 @@ class AbstractRepository:
                        fl.full_length_kg,
                        cps.cut_piece_stock_kg,
                        cps.cut_piece_scrap_kg,
+                       cps.safety_steel_kg,
                        fl.full_length_kg + cps.cut_piece_stock_kg AS total_physical_kg
                 FROM full_length fl
                   JOIN dia_grades dg ON dg.id = fl.dia_grade_id
@@ -247,6 +253,23 @@ class AbstractRepository:
             {"pid": project_id, "month_end": month_end},
         )
         return [dict(r._mapping) for r in result.fetchall()]
+
+    async def myhome_stock_by_dia(self, project_id: uuid.UUID, month_end: date) -> dict[str, Decimal]:
+        """MyHome-yard stock bucket: the LATEST snapshot per dia up to
+        month_end, never summed -- same rule as sections I/J above (migration
+        0010). Rolls into Total Physical (K) alongside contractor-held stock."""
+        result = await self.session.execute(
+            text(
+                """
+                SELECT DISTINCT ON (ms.dia_grade_id) dg.diameter_mm AS dia, ms.qty_kg
+                FROM myhome_stock ms JOIN dia_grades dg ON dg.id = ms.dia_grade_id
+                WHERE ms.project_id = :pid AND ms.effective_date < :month_end
+                ORDER BY ms.dia_grade_id, ms.effective_date DESC, ms.id DESC
+                """
+            ),
+            {"pid": project_id, "month_end": month_end},
+        )
+        return {str(r.dia): r.qty_kg for r in result.fetchall()}
 
     async def section_n_scrap_sold(self, project_id: uuid.UUID, month_end: date) -> Decimal:
         """Section N: scrap_sale totals (project-wide, not per-dia -- the

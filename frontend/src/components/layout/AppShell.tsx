@@ -17,6 +17,7 @@ import {
   TriangleAlert,
   Truck,
   Users,
+  Warehouse,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
@@ -67,6 +68,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/bbs", label: "BBS Plan", icon: Ruler },
       { to: "/jmr", label: "JMR Actual", icon: ClipboardCheck },
       { to: "/physical-counts", label: "Physical Count", icon: Grid3x3 },
+      { to: "/myhome-stock", label: "Stock at My Home", icon: Warehouse },
       { to: "/scrap", label: "Scrap", icon: Recycle },
     ],
   },
@@ -103,6 +105,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/bbs": "BBS Plan",
   "/jmr": "JMR Actual",
   "/physical-counts": "Physical Count",
+  "/myhome-stock": "Stock at My Home",
   "/scrap": "Scrap Sales",
   "/abstract": "Monthly Steel Abstract",
   "/data-health": "Data Health",

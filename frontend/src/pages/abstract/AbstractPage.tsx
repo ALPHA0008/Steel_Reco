@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw } from "lucide-react"
+import { Link } from "react-router-dom"
+import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Page, PageHeader } from "@/components/app/page"
@@ -64,6 +65,10 @@ interface AbstractRow {
   /** row whose Total cell is a single scalar (M %, N kg) */
   scalar?: string | null
   danger?: boolean
+  /** a labeled sub-line that's informational only (e.g. Safety Steel is
+   *  already inside J's total) — rendered indented/muted, excluded from
+   *  the running dia list's "is this a real section" semantics. */
+  breakout?: boolean
 }
 
 function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; dias: string[] } {
@@ -82,15 +87,20 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
   const H = fromDict(a.section_h_theoretical_stock)
   const I: ByDia = {}
   const J: ByDia = {}
+  // Safety steel is a labeled BREAKOUT of J (display only) -- it's already
+  // inside cut_piece_stock_kg, so it must never be added again anywhere.
+  const SAFETY: ByDia = {}
   a.sections_ij_physical_stock.forEach((r) => {
     addTo(I, r.dia, r.full_length_kg)
     addTo(J, r.dia, r.cut_piece_stock_kg)
+    addTo(SAFETY, r.dia, r.safety_steel_kg)
   })
+  const MYHOME = fromDict(a.section_myhome_stock)
   const K = fromDict(a.section_k_total_physical)
   const L = fromDict(a.section_l_wastage_qty)
 
   const dias = Array.from(
-    new Set([A, B, C, D, E, F, G, H, I, J, K, L].flatMap((m) => Object.keys(m))),
+    new Set([A, B, C, D, E, F, G, H, I, J, SAFETY, MYHOME, K, L].flatMap((m) => Object.keys(m))),
   ).sort((x, y) => parseFloat(x) - parseFloat(y))
 
   const m = a.section_m_wastage_pct == null ? null : parseFloat(a.section_m_wastage_pct)
@@ -99,14 +109,28 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
     { code: "A", label: "Received", values: A },
     { code: "B", label: "Transferred out", values: B },
     { code: "C", label: "Net Received", formula: "C = A − B", computed: true, values: C },
+    {
+      code: "C1",
+      label: "Stock at My Home",
+      formula: "Latest snapshot — steel at My Home's own yard, not a contractor's site",
+      values: MYHOME,
+      breakout: true,
+    },
     { code: "D", label: "Issued to Contractor", formula: "D = Σ issues out − Σ returns in (genuine sum, never = C)", values: D },
     { code: "E", label: "Consumption", values: E },
     { code: "F", label: "Work in Progress", values: F },
     { code: "G", label: "Consumption + WIP", formula: "G = E + F", computed: true, values: G },
     { code: "H", label: "Theoretical Stock", formula: "H = C − G", computed: true, values: H },
     { code: "I", label: "Physical — Full length", values: I },
+    {
+      code: "I1",
+      label: "— of which, Safety Steel",
+      formula: "Already counted inside J (Cut pieces) — shown separately for visibility, never added again",
+      values: SAFETY,
+      breakout: true,
+    },
     { code: "J", label: "Physical — Cut pieces (stock)", values: J },
-    { code: "K", label: "Total Physical", formula: "K = I + J", computed: true, values: K },
+    { code: "K", label: "Total Physical", formula: "K = I + J + Stock at My Home", computed: true, values: K },
     { code: "L", label: "Wastage Qty", formula: "L = H − K", computed: true, values: L },
     {
       code: "M",
@@ -126,9 +150,9 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
  *  stripes into a readable structure: what came in, what went out/used, what's
  *  left, and the result. */
 const BAND_OF: Record<string, string> = {
-  A: "Inbound", B: "Inbound", C: "Inbound",
+  A: "Inbound", B: "Inbound", C: "Inbound", C1: "Inbound",
   D: "Issued & consumed", E: "Issued & consumed", F: "Issued & consumed", G: "Issued & consumed",
-  H: "Stock", I: "Stock", J: "Stock", K: "Stock",
+  H: "Stock", I: "Stock", I1: "Stock", J: "Stock", K: "Stock",
   L: "Reconciliation", M: "Reconciliation", N: "Reconciliation",
 }
 
@@ -294,6 +318,11 @@ export function AbstractPage() {
                 <TabsTrigger value="kg">KG</TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button variant="outline" asChild>
+              <Link to="/abstract/draft">
+                <Sparkles /> Quick Draft
+              </Link>
+            </Button>
             <Button variant="outline" disabled={exporting} onClick={handleExport}>
               <Download /> {exporting ? "Exporting…" : "Export"}
             </Button>
@@ -385,7 +414,9 @@ export function AbstractPage() {
                     const total = Object.values(row.values).reduce((s, v) => s + v, 0)
                     const band = BAND_OF[row.code]
                     const bandStart = idx === 0 || BAND_OF[built.rows[idx - 1].code] !== band
-                    const label = (
+                    const label = row.breakout ? (
+                      <span className="pl-4 text-muted-foreground italic">{row.label}</span>
+                    ) : (
                       <span className={cn("font-medium", row.computed && "text-info")}>
                         {row.code} · {row.label}
                         {row.computed && (
@@ -409,6 +440,7 @@ export function AbstractPage() {
                         className={cn(
                           "transition-colors odd:bg-row-stripe hover:bg-row-hover",
                           row.danger && "bg-danger-subtle font-semibold text-danger odd:bg-danger-subtle hover:bg-danger-subtle",
+                          row.breakout && "text-[12px] text-muted-foreground",
                         )}
                       >
                         <td className={cn("sticky left-0 z-10 h-9 border-b bg-row-pinned px-4", row.danger && "bg-danger-subtle text-danger")}>

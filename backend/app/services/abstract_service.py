@@ -89,6 +89,7 @@ class AbstractService:
         section_e = await self._repo.section_e_consumption(project_id, month_end)
         section_f = await self._repo.section_f_wip(project_id, month_end)
         sections_ij = await self._repo.sections_ij_physical_stock(project_id, month_end)
+        myhome_by_dia = await self._repo.myhome_stock_by_dia(project_id, month_end)
         scrap_kg = await self._repo.section_n_scrap_sold(project_id, month_end)
 
         a_by_dia = _sum_by_dia(section_a, "total_received_kg")
@@ -110,7 +111,15 @@ class AbstractService:
             for dia in set(c_by_dia) | set(g_by_dia)
         }
 
+        # K = I + J + MyHome-yard stock (migration 0010). myhome_by_dia is {}
+        # for every project that has never recorded MyHome stock, so K is
+        # numerically unchanged (still I + J) for all existing data --
+        # this only adds a third bucket when a QS actually uses it.
         k_by_dia = _sum_by_dia(sections_ij, "total_physical_kg")
+        k_by_dia = {
+            dia: k_by_dia.get(dia, Decimal("0")) + myhome_by_dia.get(dia, Decimal("0"))
+            for dia in set(k_by_dia) | set(myhome_by_dia)
+        }
 
         l_by_dia = {
             dia: h_by_dia.get(dia, Decimal("0")) - k_by_dia.get(dia, Decimal("0"))
@@ -159,6 +168,7 @@ class AbstractService:
             section_g_consumption_plus_wip=g_by_dia,
             section_h_theoretical_stock=h_by_dia,
             sections_ij_physical_stock=sections_ij,
+            section_myhome_stock=myhome_by_dia,
             section_k_total_physical=k_by_dia,
             section_l_wastage_qty=l_by_dia,
             section_m_wastage_pct=m_wastage_pct,

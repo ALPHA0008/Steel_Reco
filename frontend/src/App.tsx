@@ -62,9 +62,18 @@ const PhysicalCountListPage = lazy(() =>
 const PhysicalCountNewPage = lazy(() =>
   import("@/pages/physical-counts/PhysicalCountNewPage").then((m) => ({ default: m.PhysicalCountNewPage })),
 )
+const MyHomeStockListPage = lazy(() =>
+  import("@/pages/myhome-stock/MyHomeStockListPage").then((m) => ({ default: m.MyHomeStockListPage })),
+)
+const MyHomeStockNewPage = lazy(() =>
+  import("@/pages/myhome-stock/MyHomeStockNewPage").then((m) => ({ default: m.MyHomeStockNewPage })),
+)
 const ScrapListPage = lazy(() => import("@/pages/scrap/ScrapListPage").then((m) => ({ default: m.ScrapListPage })))
 const ScrapNewPage = lazy(() => import("@/pages/scrap/ScrapNewPage").then((m) => ({ default: m.ScrapNewPage })))
 const AbstractPage = lazy(() => import("@/pages/abstract/AbstractPage").then((m) => ({ default: m.AbstractPage })))
+const AbstractDraftPage = lazy(() =>
+  import("@/pages/abstract/AbstractDraftPage").then((m) => ({ default: m.AbstractDraftPage })),
+)
 const DataHealthPage = lazy(() =>
   import("@/pages/data-health/DataHealthPage").then((m) => ({ default: m.DataHealthPage })),
 )
@@ -129,9 +138,12 @@ export default function App() {
                   <Route path="/jmr/new" element={<JmrNewPage />} />
                   <Route path="/physical-counts" element={<PhysicalCountListPage />} />
                   <Route path="/physical-counts/new" element={<PhysicalCountNewPage />} />
+                  <Route path="/myhome-stock" element={<MyHomeStockListPage />} />
+                  <Route path="/myhome-stock/new" element={<MyHomeStockNewPage />} />
                   <Route path="/scrap" element={<ScrapListPage />} />
                   <Route path="/scrap/new" element={<ScrapNewPage />} />
                   <Route path="/abstract" element={<AbstractPage />} />
+                  <Route path="/abstract/draft" element={<AbstractDraftPage />} />
                   <Route path="/data-health" element={<DataHealthPage />} />
                 </Route>
                 <Route path="/admin" element={<RequireAdmin><AdminDashboardPage /></RequireAdmin>} />

@@ -278,6 +278,27 @@ class PhysicalCountResponse(BaseModel):
     cut_pieces: list[CutPieceResponse] = []
 
 
+class MyHomeStockCreate(BaseModel):
+    dia_grade_id: uuid.UUID
+    qty_kg: Decimal = Field(ge=0)
+    effective_date: date
+    notes: str | None = None
+
+
+class MyHomeStockResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    dia_grade_id: uuid.UUID
+    qty_kg: Decimal
+    effective_date: date
+    notes: str | None
+    corrected_from_id: uuid.UUID | None
+    created_by: uuid.UUID
+    created_at: datetime
+
+
 class ScrapSaleCreate(BaseModel):
     buyer_name: str = Field(min_length=1)
     weight_kg: Decimal = Field(gt=0)
