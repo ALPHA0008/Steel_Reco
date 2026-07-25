@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { motion } from "motion/react"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
 import {
   ArrowLeftRight,
@@ -181,13 +182,28 @@ function NavList({
                     variant === "drawer" ? "h-11" : "h-9",
                     "hover:bg-accent hover:text-foreground",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                    isActive &&
-                      "bg-brand-subtle font-semibold text-brand-text before:absolute before:-left-3 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r before:bg-brand",
+                    isActive && "bg-brand-subtle font-semibold text-brand-text",
                   )
                 }
               >
-                <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
-                {item.label}
+                {({ isActive }) => (
+                  <>
+                    {/* The active marker is one shared element per nav variant,
+                        so navigating SLIDES it to the new item instead of
+                        popping a new pseudo-element into place. layoutId ties
+                        the instances together across list items. */}
+                    {isActive && (
+                      <motion.span
+                        layoutId={`nav-active-${variant}`}
+                        aria-hidden
+                        className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r bg-brand"
+                        transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
+                      />
+                    )}
+                    <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
+                    {item.label}
+                  </>
+                )}
               </NavLink>
             ),
           )}

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { CircleCheck, TriangleAlert, OctagonAlert, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
@@ -32,7 +33,12 @@ type SevFilter = "all" | "blocking" | "advisory"
  * Triage first: blocking exceptions sort to the top and carry a red stripe so
  * a physically-impossible violation never reads the same as a 20% advisory.
  */
+/** Card as a motion component, so each exception can carry layout/enter/exit
+ *  animation while keeping the shared Card styling. */
+const MotionCard = motion.create(Card)
+
 export function ExceptionsInboxPage() {
+  const reduceMotion = useReducedMotion()
   const [tab, setTab] = useState<"open" | "resolved">("open")
   const [sev, setSev] = useState<SevFilter>("all")
   const exceptions = useExceptions(tab)
@@ -141,15 +147,29 @@ export function ExceptionsInboxPage() {
           />
         </Card>
       ) : (
-        <div className="space-y-3">
+        <motion.div layout className="space-y-3">
+          {/* AnimatePresence + layout so changing the severity filter or page
+              re-flows smoothly instead of swapping rows instantly. `popLayout`
+              takes exiting cards out of the layout immediately, so the
+              remaining ones close the gap in one motion rather than waiting. */}
+          <AnimatePresence mode="popLayout" initial={false}>
           {rows.map((exc, i) => {
             const blocking = exc.severity === "blocking"
             return (
-              <Card
+              <MotionCard
                 key={exc.id}
-                style={{ "--stagger-index": Math.min(i, 8) } as CSSProperties}
+                layout
+                initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97 }}
+                transition={{
+                  duration: 0.32,
+                  delay: reduceMotion ? 0 : Math.min(i, 8) * 0.035,
+                  ease: [0.23, 1, 0.32, 1],
+                  layout: { duration: 0.28, ease: [0.23, 1, 0.32, 1] },
+                }}
                 className={cn(
-                  "stagger-in relative overflow-hidden p-4 shadow-(--shadow-card)",
+                  "relative overflow-hidden p-4 shadow-(--shadow-card)",
                   // Severity stripe down the left edge — the fastest scan cue.
                   "before:absolute before:inset-y-0 before:left-0 before:w-1",
                   blocking ? "before:bg-danger" : "before:bg-warning",
@@ -213,9 +233,10 @@ export function ExceptionsInboxPage() {
                     </div>
                   )}
                 </div>
-              </Card>
+              </MotionCard>
             )
           })}
+          </AnimatePresence>
 
           {/* Pagination — only when the list runs past one page. */}
           {sorted.length > PAGE_SIZE && (
@@ -252,7 +273,7 @@ export function ExceptionsInboxPage() {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       <ConfirmDialog

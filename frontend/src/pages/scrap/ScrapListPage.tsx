@@ -88,18 +88,36 @@ export function ScrapListPage() {
         {!sales.isLoading && summary.count > 0 && (
           <SummaryStrip
             stats={[
-              { label: "Sales", value: summary.count.toLocaleString("en-IN") },
-              { label: "Total weight", value: `${formatKg(summary.totalKg)} kg` },
+              {
+                label: "Sales",
+                value: summary.count.toLocaleString("en-IN"),
+                numericValue: summary.count,
+                format: (n) => Math.round(n).toLocaleString("en-IN"),
+              },
+              {
+                label: "Total weight",
+                value: `${formatKg(summary.totalKg)} kg`,
+                numericValue: summary.totalKg,
+                format: (n) => `${formatKg(n)} kg`,
+              },
               {
                 label: "Total value",
-                value: summary.totalValue.toLocaleString("en-IN", {
-                  style: "currency",
-                  currency: "INR",
-                  maximumFractionDigits: 0,
-                }),
+                value: formatInr(String(summary.totalValue)),
+                numericValue: summary.totalValue,
+                format: (n) =>
+                  n.toLocaleString("en-IN", {
+                    style: "currency",
+                    currency: "INR",
+                    maximumFractionDigits: 0,
+                  }),
                 tone: "success",
               },
-              { label: "Buyers", value: summary.distinctBuyers.toLocaleString("en-IN") },
+              {
+                label: "Buyers",
+                value: summary.distinctBuyers.toLocaleString("en-IN"),
+                numericValue: summary.distinctBuyers,
+                format: (n) => Math.round(n).toLocaleString("en-IN"),
+              },
             ]}
           />
         )}

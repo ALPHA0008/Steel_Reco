@@ -171,12 +171,29 @@ export function GrnListPage() {
           {!grns.isLoading && summary.count > 0 && (
             <SummaryStrip
               stats={[
-                { label: "Receipts", value: summary.count.toLocaleString("en-IN") },
-                { label: "Total received", value: `${formatKg(summary.totalKg)} kg` },
-                { label: "Vendors", value: summary.distinctVendors.toLocaleString("en-IN") },
+                {
+                  label: "Receipts",
+                  value: summary.count.toLocaleString("en-IN"),
+                  numericValue: summary.count,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
+                },
+                {
+                  label: "Total received",
+                  value: `${formatKg(summary.totalKg)} kg`,
+                  numericValue: summary.totalKg,
+                  format: (n) => `${formatKg(n)} kg`,
+                },
+                {
+                  label: "Vendors",
+                  value: summary.distinctVendors.toLocaleString("en-IN"),
+                  numericValue: summary.distinctVendors,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
+                },
                 {
                   label: "Flagged",
                   value: summary.flagged.toLocaleString("en-IN"),
+                  numericValue: summary.flagged,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
                   tone: summary.flagged > 0 ? "warning" : "muted",
                   hint: summary.flagged > 0 ? "reconciliation advisory" : "all clean",
                 },

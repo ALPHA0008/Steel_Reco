@@ -116,8 +116,10 @@ export function DataTable<T>({
                 key={rowKey(row)}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
-                  "transition-colors odd:bg-row-stripe hover:bg-row-hover",
-                  onRowClick && "cursor-pointer",
+                  "transition-colors duration-150 odd:bg-row-stripe hover:bg-row-hover",
+                  // A clickable row should acknowledge the press, not just the
+                  // hover -- otherwise a tap on mobile gives no feedback at all.
+                  onRowClick && "cursor-pointer active:bg-row-selected",
                 )}
               >
                 {columns.map((c) => (

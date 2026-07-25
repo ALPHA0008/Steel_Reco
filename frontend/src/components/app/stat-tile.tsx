@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { type ReactNode } from "react"
 import { ArrowDownRight, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Sparkline } from "@/components/app/sparkline"
+import { CountingNumber } from "@/components/app/counting-number"
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info"
 
@@ -11,32 +12,6 @@ const VALUE_TONE: Record<Tone, string> = {
   warning: "text-warning",
   danger: "text-danger",
   info: "text-info",
-}
-
-/** Count up a numeric value on mount (executive polish). Falls back to the
- * formatted string for non-numeric values. */
-function useCountUp(target: number, enabled: boolean) {
-  const [v, setV] = useState(enabled ? 0 : target)
-  const ref = useRef(target)
-  ref.current = target
-  useEffect(() => {
-    if (!enabled) {
-      setV(target)
-      return
-    }
-    let raf = 0
-    const start = performance.now()
-    const dur = 800
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / dur)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setV(ref.current * eased)
-      if (t < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [target, enabled])
-  return v
 }
 
 /**
@@ -81,9 +56,6 @@ export function StatTile({
   countUp?: boolean
   format?: (n: number) => string
 }) {
-  const counted = useCountUp(numericValue ?? 0, countUp && numericValue !== undefined)
-  const display = numericValue !== undefined ? format(counted) : (value ?? "—")
-
   const deltaUp = (delta ?? 0) > 0
   const deltaColor =
     delta == null || delta === 0
@@ -93,7 +65,7 @@ export function StatTile({
         : "text-success"
 
   return (
-    <div className="group flex flex-col justify-between rounded-2xl border bg-card p-5 shadow-(--shadow-card) transition-shadow hover:shadow-[0_4px_24px_rgba(20,20,22,0.08)]">
+    <div className="group flex flex-col justify-between rounded-2xl border bg-card p-5 shadow-(--shadow-card) transition-[transform,box-shadow] duration-200 ease-out-strong hover:shadow-[0_10px_30px_rgba(20,20,22,0.10)] [@media(hover:hover)]:hover:-translate-y-0.5">
       <div className="flex items-start justify-between">
         <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
         {icon && (
@@ -106,7 +78,15 @@ export function StatTile({
       <div className="mt-3 flex items-end justify-between gap-3">
         <div>
           <div className={cn("tnum font-display text-[28px] font-semibold leading-none tracking-tight", VALUE_TONE[tone])}>
-            {display}
+            {numericValue !== undefined ? (
+              countUp ? (
+                <CountingNumber value={numericValue} format={format} />
+              ) : (
+                format(numericValue)
+              )
+            ) : (
+              (value ?? "—")
+            )}
             {unit && <span className="ml-1 text-[13px] font-normal tracking-normal text-muted-foreground">{unit}</span>}
           </div>
           {(delta != null || deltaLabel) && (

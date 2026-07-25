@@ -1,9 +1,14 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
+import { CountingNumber } from "@/components/app/counting-number"
 
 export interface SummaryStat {
   label: string
   value: ReactNode
+  /** When given (with `format`), the figure counts up instead of rendering
+   *  `value` statically -- `value` stays the non-animated fallback. */
+  numericValue?: number
+  format?: (n: number) => string
   /** optional tone for the value */
   tone?: "default" | "brand" | "success" | "warning" | "danger" | "muted"
   hint?: string
@@ -35,7 +40,11 @@ export function SummaryStrip({ stats, className }: { stats: SummaryStat[]; class
         <div key={s.label} className="px-4 py-3">
           <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">{s.label}</div>
           <div className={cn("tnum mt-1 text-[19px] font-semibold leading-tight", TONE[s.tone ?? "default"])}>
-            {s.value}
+            {s.numericValue !== undefined && s.format ? (
+              <CountingNumber value={s.numericValue} format={s.format} />
+            ) : (
+              s.value
+            )}
           </div>
           {s.hint && <div className="mt-0.5 text-[11px] text-muted-foreground">{s.hint}</div>}
         </div>

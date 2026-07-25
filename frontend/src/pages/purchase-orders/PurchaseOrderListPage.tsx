@@ -101,12 +101,29 @@ export function PurchaseOrderListPage() {
         {!pos.isLoading && summary.count > 0 && (
           <SummaryStrip
             stats={[
-              { label: "POs", value: summary.count.toLocaleString("en-IN") },
-              { label: "Total ordered", value: `${formatKg(summary.totalOrdered)} kg` },
-              { label: "Vendors", value: summary.distinctVendors.toLocaleString("en-IN") },
+              {
+                label: "POs",
+                value: summary.count.toLocaleString("en-IN"),
+                numericValue: summary.count,
+                format: (n) => Math.round(n).toLocaleString("en-IN"),
+              },
+              {
+                label: "Total ordered",
+                value: `${formatKg(summary.totalOrdered)} kg`,
+                numericValue: summary.totalOrdered,
+                format: (n) => `${formatKg(n)} kg`,
+              },
+              {
+                label: "Vendors",
+                value: summary.distinctVendors.toLocaleString("en-IN"),
+                numericValue: summary.distinctVendors,
+                format: (n) => Math.round(n).toLocaleString("en-IN"),
+              },
               {
                 label: "Closed",
                 value: summary.closed.toLocaleString("en-IN"),
+                numericValue: summary.closed,
+                format: (n) => Math.round(n).toLocaleString("en-IN"),
                 tone: "muted",
               },
             ]}

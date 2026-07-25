@@ -31,11 +31,19 @@ import {
   formatKg,
 } from "@/lib/queries"
 
+/** kg string -> MT number, for the count-up animation to drive. */
+function mtValue(kg: string): number {
+  return (parseFloat(kg) || 0) / 1000
+}
+
+/** The one formatter every MT figure on this page renders through -- shared by
+ * the static fallback and each animated frame so they never differ. */
+function mtFormat(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function mt(kg: string): string {
-  return (parseFloat(kg) / 1000).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return mtFormat(mtValue(kg))
 }
 
 /** Landing view: this month at a glance, then straight into the work. */
@@ -84,6 +92,8 @@ export function DashboardPage() {
             <KpiCard
               label="Net Received"
               value={mt(summary.data.total_received_kg)}
+              numericValue={mtValue(summary.data.total_received_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<PackageOpen />}
               chip="Cumulative"
@@ -91,6 +101,8 @@ export function DashboardPage() {
             <KpiCard
               label="Issued to Contractors"
               value={mt(summary.data.total_issued_kg)}
+              numericValue={mtValue(summary.data.total_issued_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<ArrowLeftRight />}
               chip="Genuine sum of issues"
@@ -99,6 +111,8 @@ export function DashboardPage() {
             <KpiCard
               label="Scrap Sold"
               value={mt(summary.data.total_scrap_sold_kg)}
+              numericValue={mtValue(summary.data.total_scrap_sold_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<Recycle />}
               chip="Section N"
@@ -106,6 +120,8 @@ export function DashboardPage() {
             <KpiCard
               label="Wastage"
               value={wastage == null ? "—" : `${wastage.toFixed(2)}%`}
+              numericValue={wastage ?? undefined}
+              format={(n) => `${n.toFixed(2)}%`}
               tone={overCap ? "danger" : wastage != null ? "success" : undefined}
               icon={<TriangleAlert />}
               chip={
