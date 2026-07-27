@@ -124,7 +124,7 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
     { code: "I", label: "Physical — Full length", values: I },
     {
       code: "I1",
-      label: "— of which, Safety Steel",
+      label: "of which, Safety Steel",
       formula: "Already counted inside J (Cut pieces) — shown separately for visibility, never added again",
       values: SAFETY,
       breakout: true,
@@ -414,23 +414,47 @@ export function AbstractPage() {
                     const total = Object.values(row.values).reduce((s, v) => s + v, 0)
                     const band = BAND_OF[row.code]
                     const bandStart = idx === 0 || BAND_OF[built.rows[idx - 1].code] !== band
+                    // Three typographic levels: band header (below) > lettered
+                    // section > sub-row. A sub-row has no letter of its own --
+                    // it belongs to the section above it -- so it's rendered as
+                    // an indented branch off that row rather than a peer.
                     const label = row.breakout ? (
-                      <span className="pl-4 text-muted-foreground italic">{row.label}</span>
+                      <span className="flex items-center gap-2 pl-5">
+                        <span aria-hidden className="text-muted-foreground/40">└</span>
+                        <span className="text-[12.5px] font-medium text-muted-foreground">{row.label}</span>
+                      </span>
                     ) : (
-                      <span className={cn("font-medium", row.computed && "text-info")}>
-                        {row.code} · {row.label}
-                        {row.computed && (
-                          <span aria-hidden className="ml-1 text-[10px] text-muted-foreground">ⓕ</span>
-                        )}
+                      <span className="flex items-baseline gap-2">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "w-3.5 shrink-0 text-[11px] font-semibold tabular-nums",
+                            row.computed ? "text-info/60" : "text-muted-foreground/60",
+                          )}
+                        >
+                          {row.code}
+                        </span>
+                        <span className={cn("font-semibold", row.computed && "text-info")}>
+                          {row.label}
+                          {row.computed && (
+                            <span aria-hidden className="ml-1 text-[10px] text-muted-foreground">ⓕ</span>
+                          )}
+                        </span>
                       </span>
                     )
                     return (
                       <Fragment key={row.code}>
                       {bandStart && (
-                        <tr className="bg-background">
+                        <tr className="bg-muted/40">
                           <td
                             colSpan={built.dias.length + 2}
-                            className="sticky left-0 h-7 border-b border-t px-4 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70"
+                            className={cn(
+                              "sticky left-0 border-b border-t px-4 text-[11px] font-bold uppercase tracking-[0.1em] text-foreground/75",
+                              // The first band sits right under the column
+                              // header, so it needs less top room than the ones
+                              // that break up the flow mid-table.
+                              idx === 0 ? "h-8" : "h-9 pt-1",
+                            )}
                           >
                             {band}
                           </td>
@@ -440,10 +464,19 @@ export function AbstractPage() {
                         className={cn(
                           "transition-colors odd:bg-row-stripe hover:bg-row-hover",
                           row.danger && "bg-danger-subtle font-semibold text-danger odd:bg-danger-subtle hover:bg-danger-subtle",
-                          row.breakout && "text-[12px] text-muted-foreground",
+                          // Sub-rows read quieter than their parent section but
+                          // their figures stay fully legible -- only the label
+                          // is de-emphasised, not the data.
+                          row.breakout && "text-[12.5px]",
                         )}
                       >
-                        <td className={cn("sticky left-0 z-10 h-9 border-b bg-row-pinned px-4", row.danger && "bg-danger-subtle text-danger")}>
+                        <td
+                          className={cn(
+                            "sticky left-0 z-10 border-b bg-row-pinned px-4",
+                            row.breakout ? "h-8" : "h-9",
+                            row.danger && "bg-danger-subtle text-danger",
+                          )}
+                        >
                           {row.formula ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -467,7 +500,10 @@ export function AbstractPage() {
                           return (
                             <td
                               key={d}
-                              className="tnum relative h-9 border-b px-4 text-right"
+                              className={cn(
+                                "tnum relative border-b px-4 text-right",
+                                row.breakout ? "h-8 text-muted-foreground" : "h-9",
+                              )}
                               style={
                                 isL && share > 0
                                   ? { background: `color-mix(in srgb, var(--warning) ${Math.round(share * 55)}%, transparent)` }
@@ -478,7 +514,13 @@ export function AbstractPage() {
                             </td>
                           )
                         })}
-                        <td className={cn("tnum sticky right-0 z-10 h-9 border-b bg-row-pinned px-4 text-right font-semibold", row.danger && "bg-danger-subtle text-danger")}>
+                        <td
+                          className={cn(
+                            "tnum sticky right-0 z-10 border-b bg-row-pinned px-4 text-right",
+                            row.breakout ? "h-8 font-medium text-muted-foreground" : "h-9 font-semibold",
+                            row.danger && "bg-danger-subtle text-danger",
+                          )}
+                        >
                           {row.code === "M"
                             ? row.scalar
                             : row.code === "N"

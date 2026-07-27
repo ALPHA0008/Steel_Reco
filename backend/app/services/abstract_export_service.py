@@ -51,10 +51,14 @@ class AbstractExportService:
         H = {k: float(v) for k, v in a.section_h_theoretical_stock.items()}
         I_: dict[str, float] = {}
         J: dict[str, float] = {}
+        # Safety steel is a labeled BREAKOUT of J (display only) -- already
+        # inside cut_piece_stock_kg, so it must never be added again anywhere.
+        Safety: dict[str, float] = {}
         for row in a.sections_ij_physical_stock:
             dia = str(row["dia"])
             I_[dia] = I_.get(dia, 0.0) + float(row.get("full_length_kg") or 0)
             J[dia] = J.get(dia, 0.0) + float(row.get("cut_piece_stock_kg") or 0)
+            Safety[dia] = Safety.get(dia, 0.0) + float(row.get("safety_steel_kg") or 0)
         MyHome = {k: float(v) for k, v in a.section_myhome_stock.items()}
         K = {k: float(v) for k, v in a.section_k_total_physical.items()}
         L = {k: float(v) for k, v in a.section_l_wastage_qty.items()}
@@ -62,21 +66,24 @@ class AbstractExportService:
         n_kg = float(a.section_n_scrap_sold_kg)
 
         dias = sorted(
-            {d for m in (A, B, C, D, E, F, G, H, I_, J, MyHome, K, L) for d in m},
+            {d for m in (A, B, C, D, E, F, G, H, I_, J, Safety, MyHome, K, L) for d in m},
             key=lambda x: float(x),
         )
 
+        # Sub-rows carry no section letter -- they belong to the lettered row
+        # above them -- and are indented, mirroring the on-screen hierarchy.
         rows: list[tuple] = [
             ("A", "Received", A, False, None),
             ("B", "Transferred out", B, False, None),
             ("C", "Net Received", C, True, "= A - B"),
-            ("C1", "Stock at My Home", MyHome, False, "steel at My Home's own yard"),
+            ("", "    Stock at My Home", MyHome, False, "steel at My Home's own yard"),
             ("D", "Issued to Contractor", D, False, "genuine sum, never = C"),
             ("E", "Consumption", E, False, None),
             ("F", "Work in Progress", F, False, None),
             ("G", "Consumption + WIP", G, True, "= E + F"),
             ("H", "Theoretical Stock", H, True, "= C - G"),
             ("I", "Physical — Full length", I_, False, None),
+            ("", "    of which, Safety Steel", Safety, False, "already inside J -- never added again"),
             ("J", "Physical — Cut pieces (stock)", J, False, None),
             ("K", "Total Physical", K, True, "= I + J + Stock at My Home"),
             ("L", "Wastage Qty", L, True, "= H - K"),
