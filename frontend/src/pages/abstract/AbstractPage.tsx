@@ -156,6 +156,19 @@ const BAND_OF: Record<string, string> = {
   L: "Reconciliation", M: "Reconciliation", N: "Reconciliation",
 }
 
+/** Each band gets a semantic colour so the four phases of the reconciliation
+ *  are scannable at a glance, not just readable: steel arrives (info blue),
+ *  goes out and is used (warning amber), what's left on hand (success green),
+ *  and the verdict where money leaks (danger red). Bar + tint + text, so the
+ *  cue survives greyscale printing and colour-blindness (the label still
+ *  reads) while carrying real meaning in colour. */
+const BAND_STYLE: Record<string, { bar: string; tint: string; text: string }> = {
+  Inbound: { bar: "bg-info", tint: "bg-info-subtle", text: "text-info" },
+  "Issued & consumed": { bar: "bg-warning", tint: "bg-warning-subtle", text: "text-warning" },
+  Stock: { bar: "bg-success", tint: "bg-success-subtle", text: "text-success" },
+  Reconciliation: { bar: "bg-danger", tint: "bg-danger-subtle", text: "text-danger" },
+}
+
 function fmt(kg: number | undefined, unit: "kg" | "mt"): string {
   if (kg === undefined || kg === 0) return "—"
   const v = unit === "mt" ? kg / 1000 : kg
@@ -434,7 +447,7 @@ export function AbstractPage() {
                         >
                           {row.code}
                         </span>
-                        <span className={cn("font-semibold", row.computed && "text-info")}>
+                        <span className={cn("font-bold", row.computed && "text-info")}>
                           {row.label}
                           {row.computed && (
                             <span aria-hidden className="ml-1 text-[10px] text-muted-foreground">ⓕ</span>
@@ -445,18 +458,33 @@ export function AbstractPage() {
                     return (
                       <Fragment key={row.code}>
                       {bandStart && (
-                        <tr className="bg-muted/40">
+                        <tr className={BAND_STYLE[band]?.tint}>
                           <td
                             colSpan={built.dias.length + 2}
                             className={cn(
-                              "sticky left-0 border-b border-t px-4 text-[11px] font-bold uppercase tracking-[0.1em] text-foreground/75",
+                              "sticky left-0 border-b border-t px-0",
                               // The first band sits right under the column
                               // header, so it needs less top room than the ones
                               // that break up the flow mid-table.
-                              idx === 0 ? "h-8" : "h-9 pt-1",
+                              idx === 0 ? "h-9" : "h-10",
                             )}
                           >
-                            {band}
+                            <span className="flex items-center gap-2.5">
+                              {/* Solid colour bar keeps the band identifiable
+                                  even where the tint is nearly invisible. */}
+                              <span
+                                aria-hidden
+                                className={cn("h-4 w-1 shrink-0 rounded-r", BAND_STYLE[band]?.bar)}
+                              />
+                              <span
+                                className={cn(
+                                  "text-[11.5px] font-extrabold uppercase tracking-[0.12em]",
+                                  BAND_STYLE[band]?.text,
+                                )}
+                              >
+                                {band}
+                              </span>
+                            </span>
                           </td>
                         </tr>
                       )}
