@@ -23,6 +23,15 @@ class StockRepository:
                       - store-wide issues out + issues returned in
                       - transfers out + transfers in
            (all at the dia grain, no contractor split -- plan §5.3)
+
+        Every SUM ... FILTER is individually COALESCEd, which is load-bearing
+        rather than defensive: a FILTER that matches no row yields NULL, and
+        `SUM(out) - NULL` is NULL, so an outer COALESCE(..., 0) would collapse
+        the whole term to zero. That silently dropped ALL issues from the
+        balance whenever a dia had no return row -- overstating available stock
+        and under-firing the core issue>stock invariant. Found when the
+        exception re-check (which, unlike the write path, reads stock AFTER the
+        row exists) reported a violating issue as passing.
         """
         result = await self.session.execute(
             text(
@@ -30,12 +39,12 @@ class StockRepository:
                 SELECT
                     COALESCE((SELECT SUM(weighbridge_weight_kg) FROM grn
                               WHERE project_id = :pid AND dia_grade_id = :dia), 0)
-                  - COALESCE((SELECT SUM(quantity_kg) FILTER (WHERE direction='out')
-                                    - SUM(quantity_kg) FILTER (WHERE direction='in')
-                              FROM store_issue WHERE project_id = :pid AND dia_grade_id = :dia), 0)
-                  - COALESCE((SELECT SUM(quantity_kg) FILTER (WHERE flag='loan' AND from_project_id = :pid)
-                                    - SUM(quantity_kg) FILTER (WHERE flag='return' AND to_project_id = :pid)
-                              FROM inter_site_transfer WHERE dia_grade_id = :dia), 0)
+                  - (SELECT COALESCE(SUM(quantity_kg) FILTER (WHERE direction='out'), 0)
+                          - COALESCE(SUM(quantity_kg) FILTER (WHERE direction='in'), 0)
+                     FROM store_issue WHERE project_id = :pid AND dia_grade_id = :dia)
+                  - (SELECT COALESCE(SUM(quantity_kg) FILTER (WHERE flag='loan' AND from_project_id = :pid), 0)
+                          - COALESCE(SUM(quantity_kg) FILTER (WHERE flag='return' AND to_project_id = :pid), 0)
+                     FROM inter_site_transfer WHERE dia_grade_id = :dia)
                   AS available_kg
                 """
             ),

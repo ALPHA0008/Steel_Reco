@@ -301,7 +301,14 @@ export interface ScrapSale extends Omit<ScrapSaleCreate, "notes"> {
 
 // ---- Exceptions (rules-engine output, plan §6) ----
 
-export type ExceptionStatus = "open" | "resolved" | "dismissed"
+/** "pending" = a follow-up was promised for a date that hasn't arrived yet. It
+ *  is NOT resolved: it still shows in the open queue and still blocks a close. */
+export type ExceptionStatus = "open" | "pending" | "resolved" | "dismissed"
+
+/** How a resolution was established: "verified" = the original rule was re-run
+ *  and now passes; "accepted" = a human knowingly signed it off as-is;
+ *  "pending" = awaiting a promised follow-up date. */
+export type ExceptionValidationState = "verified" | "accepted" | "pending"
 export type ExceptionResolutionType = "approved" | "corrected" | "follow_up"
 
 export interface ExceptionLog {
@@ -320,6 +327,11 @@ export interface ExceptionLog {
   resolved_by: string | null
   resolved_at: string | null
   created_at: string
+  follow_up_due_date: string | null
+  validation_state: ExceptionValidationState | null
+  validated_at: string | null
+  /** How many times a promised follow-up lapsed and the row came back. */
+  reopened_count: number
 }
 
 // ---- Dashboard ----

@@ -32,5 +32,10 @@ async def resolve_exception(
 ) -> ExceptionLogResponse:
     user_id, _role = current_user
     service = ExceptionService(session, project_id, user_id)
-    row = await service.resolve(exception_id, payload.resolution_type, payload.reason)
+    row = await service.resolve(
+        exception_id,
+        payload.resolution_type,
+        payload.reason,
+        follow_up_due_date=payload.follow_up_due_date,
+    )
     return ExceptionLogResponse.model_validate(row)

@@ -224,11 +224,19 @@ export function useExceptions(status?: string) {
 export function useResolveException() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (p: { id: string; resolution_type: ExceptionResolutionType; reason: string }) =>
+    mutationFn: async (p: {
+      id: string
+      resolution_type: ExceptionResolutionType
+      reason: string
+      /** Required for follow_up; the backend refuses a past date or one beyond
+       *  the close horizon, so a rejection here is expected, not exceptional. */
+      follow_up_due_date?: string
+    }) =>
       (
         await api.post<ExceptionLog>(`/exceptions/${p.id}/resolve`, {
           resolution_type: p.resolution_type,
           reason: p.reason,
+          follow_up_due_date: p.follow_up_due_date ?? null,
         })
       ).data,
     onSuccess: () => {

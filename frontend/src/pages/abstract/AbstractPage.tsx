@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAbstract, useFinalizeMonth, useMyProject, usePeriodBounds, useReopenMonth } from "@/lib/queries"
-import { apiErrorMessage, downloadAbstractXlsx } from "@/lib/api"
+import { apiErrorCode, apiErrorMessage, downloadAbstractXlsx } from "@/lib/api"
 import type { AbstractResponse } from "@/lib/types"
 
 /**
@@ -191,6 +191,9 @@ export function AbstractPage() {
   const [pickerYear, setPickerYear] = useState(year)
   const [pickerMonth, setPickerMonth] = useState(month)
   const [actionError, setActionError] = useState<string | null>(null)
+  // Set when finalize was refused specifically because exceptions are still
+  // unanswered, so the banner can link straight to the queue.
+  const [blockedByExceptions, setBlockedByExceptions] = useState(false)
   const [exporting, setExporting] = useState(false)
   const didInitFromBounds = useRef(false)
 
@@ -353,8 +356,25 @@ export function AbstractPage() {
       />
 
       {actionError && (
-        <Banner variant="blocking" className="mb-4" onDismiss={() => setActionError(null)}>
+        <Banner
+          variant="blocking"
+          className="mb-4"
+          onDismiss={() => {
+            setActionError(null)
+            setBlockedByExceptions(false)
+          }}
+        >
           {actionError}
+          {/* A close blocked by unanswered exceptions is a to-do, not a dead
+              end — point at the queue that has to be cleared. */}
+          {blockedByExceptions && (
+            <Link
+              to="/exceptions"
+              className="ml-1 font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Review exceptions
+            </Link>
+          )}
         </Banner>
       )}
       {abstract.isError && (
@@ -635,6 +655,7 @@ export function AbstractPage() {
         pending={finalize.isPending}
         onConfirm={() => {
           setActionError(null)
+          setBlockedByExceptions(false)
           finalize.mutate(
             { year, month },
             {
@@ -644,6 +665,7 @@ export function AbstractPage() {
               },
               onError: (err) => {
                 setFinalizeOpen(false)
+                setBlockedByExceptions(apiErrorCode(err) === "unanswered_exceptions")
                 setActionError(apiErrorMessage(err, "Could not finalize the month."))
               },
             },

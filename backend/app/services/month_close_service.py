@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import DomainError
 from app.models.system import FinalizedMonth
 from app.models.transactions import MonthlyAbstractSnapshot
+from app.repositories.exception_repository import ExceptionRepository
 from app.repositories.finalized_month_repository import FinalizedMonthRepository
 from app.repositories.snapshot_repository import SnapshotRepository
 from app.schemas.month_close import FinalizeResponse
@@ -43,6 +44,25 @@ class FutureMonthFinalize(DomainError):
         )
 
 
+class UnansweredExceptions(DomainError):
+    """Finalize attempted while exceptions are still unanswered. -> HTTP 422.
+
+    An Abstract is a claim that the month reconciles. Snapshotting it
+    immutably while the tool is still flagging problems -- or while a QS has
+    only promised to look at them later -- would freeze an unverified position
+    into the record. Every exception must be corrected (and re-checked) or
+    consciously approved with a reason first.
+    """
+
+    def __init__(self, year: int, month: int, count: int):
+        super().__init__(
+            f"cannot finalize {year}-{month:02d}: {count} exception(s) are still unanswered. "
+            "Each must be corrected (the tool re-checks it) or approved as-is with a reason. "
+            "Pending follow-ups count as unanswered -- a promise to look later is not a resolution."
+        )
+        self.count = count
+
+
 class MonthCloseService:
     def __init__(self, session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
         self._session = session
@@ -52,6 +72,7 @@ class MonthCloseService:
         self._snapshots = SnapshotRepository(session, project_id=project_id)
         self._abstract = AbstractService(session)
         self._audit = AuditService(session)
+        self._exceptions = ExceptionRepository(session, project_id=project_id)
 
     async def finalize(self, year: int, month: int) -> FinalizeResponse:
         """One transaction: compute the full Abstract -> insert the immutable
@@ -70,6 +91,14 @@ class MonthCloseService:
         existing = await self._locks.get_for_period(self._project_id, year, month)
         if existing is not None and existing.status == "locked":
             raise AlreadyFinalized(year, month)
+
+        # Nothing unanswered may be frozen into an immutable snapshot -- see
+        # UnansweredExceptions. Pending follow-ups count: a promise to look
+        # later is not a resolution, and the follow-up date is bounded precisely
+        # so it can't be parked beyond a close.
+        unanswered = await self._exceptions.count_unanswered()
+        if unanswered:
+            raise UnansweredExceptions(year, month, unanswered)
 
         abstract = await self._abstract.compute(self._project_id, year, month)
         sections_json = abstract.model_dump(mode="json")

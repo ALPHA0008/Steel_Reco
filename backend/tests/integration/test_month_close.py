@@ -114,6 +114,27 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
     )
     assert grn_resp.status_code == 201
 
+    # That GRN has no PO/invoice to reconcile against, so it raises an
+    # inbound_reconciliation advisory -- and finalize now refuses while any
+    # exception is unanswered. Answer it first; this test is about the
+    # reopen/re-finalize snapshot lifecycle, not the exception gate (which
+    # test_exception_validation covers).
+    blocked = await app_client.post(
+        "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 4}
+    )
+    assert blocked.status_code == 422
+    assert blocked.json()["error"]["code"] == "unanswered_exceptions"
+
+    open_exc = await app_client.get("/api/v1/exceptions?status=open", headers=auth_headers)
+    assert open_exc.status_code == 200
+    for exc in open_exc.json():
+        rr = await app_client.post(
+            f"/api/v1/exceptions/{exc['id']}/resolve",
+            headers=auth_headers,
+            json={"resolution_type": "approved", "reason": "no upstream doc for this back-dated test GRN"},
+        )
+        assert rr.status_code == 200, rr.text
+
     finalize_2 = await app_client.post(
         "/api/v1/month-close/finalize", headers=auth_headers, json={"year": 2022, "month": 4}
     )
@@ -136,3 +157,4 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
     row = lock_result.one()
     assert str(row.current_snapshot_id) == snapshot_2
     assert row.status == "locked"
+

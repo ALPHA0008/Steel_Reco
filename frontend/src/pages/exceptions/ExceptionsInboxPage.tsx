@@ -1,19 +1,28 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { CircleCheck, TriangleAlert, OctagonAlert, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  CircleCheck,
+  TriangleAlert,
+  OctagonAlert,
+  ChevronLeft,
+  ChevronRight,
+  CalendarClock,
+  ShieldCheck,
+  RotateCcw,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
-import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { ExceptionResolveDialog } from "@/components/app/exception-resolve-dialog"
 import { EmptyState } from "@/components/app/empty-state"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
-import { formatDateTime } from "@/lib/format"
+import { formatDate, formatDateTime } from "@/lib/format"
 import { useExceptions, useResolveException } from "@/lib/queries"
-import { apiErrorMessage } from "@/lib/api"
+import { apiErrorCode, apiErrorMessage } from "@/lib/api"
 import type { ExceptionLog, ExceptionResolutionType } from "@/lib/types"
 
 const RESOLUTION_LABEL: Record<ExceptionResolutionType, string> = {
@@ -45,10 +54,14 @@ export function ExceptionsInboxPage() {
   const resolve = useResolveException()
   const [target, setTarget] = useState<ExceptionLog | null>(null)
   const [resolutionType, setResolutionType] = useState<ExceptionResolutionType>("approved")
+  // A refused attempt (re-check still fails, bad follow-up date) keeps the
+  // dialog open and shows why, instead of closing and losing the typed reason.
+  const [rejection, setRejection] = useState<string | null>(null)
 
   function openResolve(exc: ExceptionLog, type: ExceptionResolutionType) {
     setTarget(exc)
     setResolutionType(type)
+    setRejection(null)
   }
 
   const all = exceptions.data ?? []
@@ -59,7 +72,13 @@ export function ExceptionsInboxPage() {
   // deal with is always at the top of the list.
   const sorted = useMemo(() => {
     const filtered = sev === "all" ? all : all.filter((e) => e.severity === sev)
+    // Triage order: a lapsed commitment outranks everything (someone already
+    // promised to handle it), then blocking, then a parked follow-up sinks below
+    // anything still awaiting a first decision, then newest first.
+    const rank = (e: ExceptionLog) =>
+      e.status === "open" && e.reopened_count > 0 ? 0 : e.status === "pending" ? 2 : 1
     return [...filtered].sort((a, b) => {
+      if (rank(a) !== rank(b)) return rank(a) - rank(b)
       if (a.severity !== b.severity) return a.severity === "blocking" ? -1 : 1
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
@@ -155,6 +174,12 @@ export function ExceptionsInboxPage() {
           <AnimatePresence mode="popLayout" initial={false}>
           {rows.map((exc, i) => {
             const blocking = exc.severity === "blocking"
+            // A parked follow-up reads as neither clean nor alarming: it's a
+            // commitment with a clock on it, so it gets its own quieter tone.
+            const parked = exc.status === "pending"
+            // Came back because a promised date lapsed -- the strongest signal
+            // on the card, since someone already said they'd handle it.
+            const lapsed = exc.status === "open" && exc.reopened_count > 0
             return (
               <MotionCard
                 key={exc.id}
@@ -172,7 +197,11 @@ export function ExceptionsInboxPage() {
                   "relative overflow-hidden p-4 shadow-(--shadow-card)",
                   // Severity stripe down the left edge — the fastest scan cue.
                   "before:absolute before:inset-y-0 before:left-0 before:w-1",
-                  blocking ? "before:bg-danger" : "before:bg-warning",
+                  parked
+                    ? "before:bg-muted-foreground/40"
+                    : blocking
+                      ? "before:bg-danger"
+                      : "before:bg-warning",
                 )}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -180,10 +209,20 @@ export function ExceptionsInboxPage() {
                     <span
                       className={cn(
                         "mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
-                        blocking ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning",
+                        parked
+                          ? "bg-muted text-muted-foreground"
+                          : blocking
+                            ? "bg-danger-subtle text-danger"
+                            : "bg-warning-subtle text-warning",
                       )}
                     >
-                      {blocking ? <OctagonAlert className="size-4" /> : <TriangleAlert className="size-4" />}
+                      {parked ? (
+                        <CalendarClock className="size-4" />
+                      ) : blocking ? (
+                        <OctagonAlert className="size-4" />
+                      ) : (
+                        <TriangleAlert className="size-4" />
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -201,21 +240,46 @@ export function ExceptionsInboxPage() {
                             {exc.transaction_table}
                           </span>
                         )}
+                        {parked && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                            <CalendarClock className="size-3" />
+                            Due {formatDate(exc.follow_up_due_date)}
+                          </span>
+                        )}
+                        {lapsed && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-danger-subtle px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">
+                            <RotateCcw className="size-3" />
+                            Overdue{exc.reopened_count > 1 ? ` ×${exc.reopened_count}` : ""}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-1 text-[13px] text-muted-foreground">{exc.message}</p>
+                      {/* whitespace-pre-line: an overdue re-open appends its
+                          warning as a second line of the message. */}
+                      <p className="mt-1 whitespace-pre-line text-[13px] text-muted-foreground">{exc.message}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatDateTime(exc.created_at)}
+                        {parked && exc.resolver_reason && <> · “{exc.resolver_reason}”</>}
                         {exc.status === "resolved" && exc.resolution_type && (
                           <> · {RESOLUTION_LABEL[exc.resolution_type]} — “{exc.resolver_reason}”</>
+                        )}
+                        {exc.status === "resolved" && exc.validation_state === "verified" && (
+                          <span className="ml-1 inline-flex items-center gap-1 font-medium text-success">
+                            <ShieldCheck className="size-3" />
+                            re-checked
+                          </span>
                         )}
                       </p>
                     </div>
                   </div>
-                  {exc.status === "open" && (
+                  {(exc.status === "open" || parked) && (
                     // Full-width action row on mobile (buttons no longer collide
                     // with the title); inline on desktop. "Corrected" is the
                     // primary path — it fixes the underlying record — so it's
                     // solid; the other two are quieter outline actions.
+                    //
+                    // Parked rows keep their actions: a follow-up has to land on
+                    // corrected or approved eventually, and offering "Follow up"
+                    // again lets a date be revised without waiting for it to lapse.
                     <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                       <Button
                         size="sm"
@@ -228,7 +292,7 @@ export function ExceptionsInboxPage() {
                         Approve
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => openResolve(exc, "follow_up")}>
-                        Follow up
+                        {parked ? "Reschedule" : "Follow up"}
                       </Button>
                     </div>
                   )}
@@ -276,25 +340,48 @@ export function ExceptionsInboxPage() {
         </motion.div>
       )}
 
-      <ConfirmDialog
-        open={target !== null}
-        onOpenChange={(open) => !open && setTarget(null)}
-        title={`${RESOLUTION_LABEL[resolutionType]}?`}
-        description={target?.message ?? undefined}
-        confirmLabel="Resolve"
-        requireReason
-        reasonLabel="Reason"
+      <ExceptionResolveDialog
+        exception={target}
+        resolutionType={resolutionType}
         pending={resolve.isPending}
-        onConfirm={(reason) => {
+        rejection={rejection}
+        onDismissRejection={() => setRejection(null)}
+        onOpenChange={(open) => !open && setTarget(null)}
+        onConfirm={(reason, followUpDueDate) => {
           if (!target) return
+          setRejection(null)
           resolve.mutate(
-            { id: target.id, resolution_type: resolutionType, reason: reason! },
             {
-              onSuccess: () => {
+              id: target.id,
+              resolution_type: resolutionType,
+              reason,
+              follow_up_due_date: followUpDueDate,
+            },
+            {
+              onSuccess: (row) => {
                 setTarget(null)
-                toast.success("Exception resolved.")
+                if (row.status === "pending") {
+                  toast.success(
+                    `Follow-up set for ${formatDate(row.follow_up_due_date)}. It stays open until then.`,
+                  )
+                } else if (row.validation_state === "verified") {
+                  toast.success("Re-checked against current data — it passes. Resolved.")
+                } else {
+                  toast.success("Approved as-is and recorded.")
+                }
               },
               onError: (err) => {
+                const code = apiErrorCode(err)
+                // These are decisions the flow is meant to refuse, not faults:
+                // keep the dialog open so the reason typed isn't thrown away.
+                const recoverable =
+                  code === "correction_not_verified" ||
+                  code === "follow_up_date_required" ||
+                  code === "follow_up_date_invalid"
+                if (recoverable) {
+                  setRejection(apiErrorMessage(err, "That could not be accepted."))
+                  return
+                }
                 setTarget(null)
                 toast.error(apiErrorMessage(err, "Could not resolve the exception."))
               },
