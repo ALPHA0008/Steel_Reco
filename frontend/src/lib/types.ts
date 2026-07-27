@@ -624,6 +624,8 @@ export interface DraftAbstractRequest {
   section_i_physical_full_length: Record<string, string>
   section_j_physical_cut_pieces: Record<string, string>
   section_myhome_stock: Record<string, string>
+  /** Breakout of J for display parity — never added into K. */
+  section_safety_steel: Record<string, string>
   section_n_scrap_sold_kg: string
 }
 

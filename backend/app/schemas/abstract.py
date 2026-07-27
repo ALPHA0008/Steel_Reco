@@ -89,6 +89,11 @@ class DraftAbstractRequest(BaseModel):
     section_i_physical_full_length: dict[str, Decimal] = {}
     section_j_physical_cut_pieces: dict[str, Decimal] = {}
     section_myhome_stock: dict[str, Decimal] = {}
+    # Breakout only, for parity with the real Abstract's display: safety steel
+    # is already counted inside section_j, so it is NEVER added into K. It is
+    # accepted here purely so a draft can be checked for the same internal
+    # consistency (safety steel must not exceed the cut pieces it sits inside).
+    section_safety_steel: dict[str, Decimal] = {}
     section_n_scrap_sold_kg: Decimal = Decimal("0")
 
 

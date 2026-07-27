@@ -128,7 +128,30 @@ class DraftAbstractService:
                 ),
             })
 
-        # 4. Per-dia sanity: negative net-received or negative consumption+WIP
+        # 4. Safety steel is a BREAKOUT of cut pieces (J), so it can never
+        # exceed J for the same diameter -- if it does, one of the two figures
+        # is wrong. This mirrors the real Abstract's own "never added twice"
+        # invariant, checked here since a draft has no ledger to enforce it.
+        for dia, safety in sorted(req.section_safety_steel.items(), key=lambda kv: float(kv[0])):
+            if safety <= 0:
+                continue
+            cut = req.section_j_physical_cut_pieces.get(dia, Decimal("0"))
+            if safety > cut:
+                findings.append({
+                    "rule": "safety_steel_exceeds_cut_pieces",
+                    "severity": "critical",
+                    "dia": dia,
+                    "actual_kg": str(safety),
+                    "threshold_kg": str(cut),
+                    # No dia prefix here -- the UI already renders `dia` ahead of
+                    # the message, so repeating it reads as "8mm: 8.0mm: ...".
+                    "message": (
+                        f"safety steel ({safety}kg) exceeds the cut pieces it sits inside "
+                        f"({cut}kg) -- safety steel is a subset of J, not an addition to it"
+                    ),
+                })
+
+        # 5. Per-dia sanity: negative net-received or negative consumption+WIP
         # is a straightforward sign/entry error (A<B or E+F typed backwards),
         # not a real business condition -- flag it immediately rather than
         # let it cascade into a nonsensical wastage %.
@@ -140,7 +163,7 @@ class DraftAbstractService:
                     "dia": dia,
                     "actual_kg": str(c_val),
                     "threshold_kg": "0",
-                    "message": f"{dia}mm: Net Received (A-B) is negative ({c_val}kg) -- Transferred out exceeds Received for this diameter",
+                    "message": f"Net Received (A-B) is negative ({c_val}kg) -- Transferred out exceeds Received for this diameter",
                 })
         for dia, g_val in sorted(g_by_dia.items(), key=lambda kv: float(kv[0])):
             if g_val < 0:
@@ -150,10 +173,10 @@ class DraftAbstractService:
                     "dia": dia,
                     "actual_kg": str(g_val),
                     "threshold_kg": "0",
-                    "message": f"{dia}mm: Consumption+WIP (E+F) is negative ({g_val}kg) -- check E and F for this diameter",
+                    "message": f"Consumption+WIP (E+F) is negative ({g_val}kg) -- check E and F for this diameter",
                 })
 
-        # 5. Per-dia wastage outlier: a single diameter wasting far more than
+        # 6. Per-dia wastage outlier: a single diameter wasting far more than
         # the portfolio average is the classic sign of a typo (e.g. an extra
         # digit) rather than genuine wastage -- flagged as advisory, not
         # blocking, since it can be real.
@@ -170,7 +193,7 @@ class DraftAbstractService:
                     "actual_kg": str(dia_pct),
                     "threshold_kg": str(m_wastage_pct),
                     "message": (
-                        f"{dia}mm: wastage ({dia_pct:.1f}%) is far above the portfolio average "
+                        f"wastage ({dia_pct:.1f}%) is far above the portfolio average "
                         f"({m_wastage_pct:.2f}%) -- worth double-checking this diameter's I/J/H figures for a typo"
                     ),
                 })
@@ -194,7 +217,7 @@ class DraftAbstractService:
                     "actual_kg": str(g_kg),
                     "threshold_kg": str(planned),
                     "message": (
-                        f"{dia}mm: your typed consumption+WIP ({g_kg}kg) exceeds this project's real "
+                        f"your typed consumption+WIP ({g_kg}kg) exceeds this project's real "
                         f"BBS-planned quantity ({planned}kg) by more than {self.AGGREGATE_TOLERANCE * 100:.0f}% -- "
                         "worth re-checking against the actual ledger"
                     ),

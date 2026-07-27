@@ -94,6 +94,28 @@ async def test_draft_flags_negative_net_received_as_sign_error(app_client, seede
 
 
 @pytest.mark.asyncio
+async def test_draft_flags_safety_steel_exceeding_cut_pieces(app_client, seeded_project, auth_headers):
+    """Safety steel is a BREAKOUT of J, so it can't exceed J -- and it must
+    never inflate K (Total Physical) either."""
+    resp = await app_client.post(
+        "/api/v1/abstract/draft",
+        headers=auth_headers,
+        json={
+            "period_label": "2026-06 (draft)",
+            "section_a_received": {"16": "1000"},
+            "section_i_physical_full_length": {"16": "100"},
+            "section_j_physical_cut_pieces": {"16": "20"},
+            "section_safety_steel": {"16": "50"},  # > J: impossible
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "safety_steel_exceeds_cut_pieces" in {f["rule"] for f in body["findings"]}
+    # K = I + J only (100 + 20); the safety-steel breakout is never added in.
+    assert body["section_k_total_physical"]["16"] == "120"
+
+
+@pytest.mark.asyncio
 async def test_draft_never_writes_to_the_ledger(app_client, seeded_project, auth_headers, superuser_session):
     from sqlalchemy import text
 

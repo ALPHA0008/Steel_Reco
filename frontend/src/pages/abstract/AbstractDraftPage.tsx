@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { ArrowLeft, OctagonAlert, Sparkles, TriangleAlert } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
@@ -11,19 +11,80 @@ import { useDiaGrades, useDraftAbstract, diaLabel } from "@/lib/queries"
 import { apiErrorMessage } from "@/lib/api"
 import type { DraftAbstractRequest, DraftAbstractResponse } from "@/lib/types"
 
-/** Which typed rows exist, in the order they appear in the entry grid. Codes
- * mirror the real Abstract's A-N letters so switching between the two reads
- * naturally, even though C/G/H/K/L/M are always derived, never typed here. */
-const ENTRY_ROWS: { key: keyof DraftAbstractRequest & string; code: string; label: string }[] = [
-  { key: "section_a_received", code: "A", label: "Received" },
-  { key: "section_b_transferred", code: "B", label: "Transferred out" },
-  { key: "section_myhome_stock", code: "C1", label: "Stock at My Home" },
-  { key: "section_d_issued", code: "D", label: "Issued to Contractor" },
-  { key: "section_e_consumption", code: "E", label: "Consumption" },
-  { key: "section_f_wip", code: "F", label: "Work in Progress" },
-  { key: "section_i_physical_full_length", code: "I", label: "Physical — Full length" },
-  { key: "section_j_physical_cut_pieces", code: "J", label: "Physical — Cut pieces (stock)" },
+/** The typed rows, in the SAME order and grouped into the SAME four bands as
+ * the real Abstract, so switching between the two reads identically. Codes
+ * mirror A-N; a sub-row (`breakout`) carries no letter of its own because it
+ * belongs to the lettered row above it. C/G/H/K/L/M are always derived, never
+ * typed, so they don't appear here -- they show in the results panel below. */
+interface EntryRow {
+  key: keyof DraftAbstractRequest & string
+  code: string
+  label: string
+  band: string
+  /** an indented sub-row of the section above, not a peer of A-N */
+  breakout?: boolean
+}
+
+const ENTRY_ROWS: EntryRow[] = [
+  { key: "section_a_received", code: "A", label: "Received", band: "Inbound" },
+  { key: "section_b_transferred", code: "B", label: "Transferred out", band: "Inbound" },
+  // Sits under C (Net Received) on the real Abstract -- C is derived, so here
+  // it trails the Inbound band it belongs to.
+  { key: "section_myhome_stock", code: "", label: "Stock at My Home", band: "Inbound", breakout: true },
+  { key: "section_d_issued", code: "D", label: "Issued to Contractor", band: "Issued & consumed" },
+  { key: "section_e_consumption", code: "E", label: "Consumption", band: "Issued & consumed" },
+  { key: "section_f_wip", code: "F", label: "Work in Progress", band: "Issued & consumed" },
+  { key: "section_i_physical_full_length", code: "I", label: "Physical — Full length", band: "Stock" },
+  // Sits under I on the real Abstract. A subset of J, never added into K.
+  { key: "section_safety_steel", code: "", label: "of which, Safety Steel", band: "Stock", breakout: true },
+  { key: "section_j_physical_cut_pieces", code: "J", label: "Physical — Cut pieces (stock)", band: "Stock" },
 ]
+
+/** Same band colours as the real Abstract (AbstractPage's BAND_STYLE). */
+const BAND_STYLE: Record<string, { bar: string; tint: string; text: string }> = {
+  Inbound: { bar: "bg-info", tint: "bg-info-subtle", text: "text-info" },
+  "Issued & consumed": { bar: "bg-warning", tint: "bg-warning-subtle", text: "text-warning" },
+  Stock: { bar: "bg-success", tint: "bg-success-subtle", text: "text-success" },
+  Reconciliation: { bar: "bg-danger", tint: "bg-danger-subtle", text: "text-danger" },
+}
+
+/** One band header row, matching the real Abstract's bar + tint + label. */
+function BandRow({ band, colSpan }: { band: string; colSpan: number }) {
+  const s = BAND_STYLE[band]
+  return (
+    <tr className={s?.tint}>
+      <td colSpan={colSpan} className="sticky left-0 h-9 border-b border-t px-0">
+        <span className="flex items-center gap-2.5">
+          <span aria-hidden className={cn("h-4 w-1 shrink-0 rounded-r", s?.bar)} />
+          <span className={cn("text-[11.5px] font-extrabold uppercase tracking-[0.12em]", s?.text)}>
+            {band}
+          </span>
+        </span>
+      </td>
+    </tr>
+  )
+}
+
+/** Section label matching the real Abstract: de-emphasised letter prefix, bold
+ *  name; sub-rows render as an indented branch with no letter. */
+function SectionLabel({ code, label, breakout }: { code: string; label: string; breakout?: boolean }) {
+  if (breakout) {
+    return (
+      <span className="flex items-center gap-2 pl-5">
+        <span aria-hidden className="text-muted-foreground/40">└</span>
+        <span className="text-[12.5px] font-medium text-muted-foreground">{label}</span>
+      </span>
+    )
+  }
+  return (
+    <span className="flex items-baseline gap-2">
+      <span aria-hidden className="w-3.5 shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground/60">
+        {code}
+      </span>
+      <span className="font-bold">{label}</span>
+    </span>
+  )
+}
 
 type Grid = Record<string, Record<string, string>>
 
@@ -89,6 +150,7 @@ export function AbstractDraftPage() {
       section_i_physical_full_length: cleanRow("section_i_physical_full_length"),
       section_j_physical_cut_pieces: cleanRow("section_j_physical_cut_pieces"),
       section_myhome_stock: cleanRow("section_myhome_stock"),
+      section_safety_steel: cleanRow("section_safety_steel"),
       section_n_scrap_sold_kg: scrapKg || "0",
     }
     try {
@@ -150,28 +212,44 @@ export function AbstractDraftPage() {
               </tr>
             </thead>
             <tbody>
-              {ENTRY_ROWS.map((row) => (
-                <tr key={row.key} className="odd:bg-row-stripe">
-                  <td className="sticky left-0 z-10 h-11 border-b bg-row-pinned px-4 font-medium">
-                    {row.code} · {row.label}
-                  </td>
-                  {diaCols.map((dia) => (
-                    <td key={dia} className="h-11 border-b px-1.5">
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        placeholder="0"
-                        className="tnum h-8 w-full text-right"
-                        value={grid[row.key]?.[dia] ?? ""}
-                        onChange={(e) => setCell(row.key, dia, e.target.value)}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {ENTRY_ROWS.map((row, i) => {
+                const bandStart = i === 0 || ENTRY_ROWS[i - 1].band !== row.band
+                return (
+                  <Fragment key={row.key}>
+                    {bandStart && <BandRow band={row.band} colSpan={diaCols.length + 1} />}
+                    <tr className="odd:bg-row-stripe">
+                      <td
+                        className={cn(
+                          "sticky left-0 z-10 border-b bg-row-pinned px-4",
+                          row.breakout ? "h-10" : "h-11",
+                        )}
+                      >
+                        <SectionLabel code={row.code} label={row.label} breakout={row.breakout} />
+                      </td>
+                      {diaCols.map((dia) => (
+                        <td key={dia} className={cn("border-b px-1.5", row.breakout ? "h-10" : "h-11")}>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            placeholder="0"
+                            className="tnum h-8 w-full text-right"
+                            value={grid[row.key]?.[dia] ?? ""}
+                            onChange={(e) => setCell(row.key, dia, e.target.value)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  </Fragment>
+                )
+              })}
+              {/* N (Scrap Sold) opens the Reconciliation band -- the only typed
+                  row in it; L and M are both derived. */}
+              <BandRow band="Reconciliation" colSpan={diaCols.length + 1} />
               <tr className="odd:bg-row-stripe">
-                <td className="sticky left-0 z-10 h-11 border-b bg-row-pinned px-4 font-medium">N · Scrap Sold (kg)</td>
+                <td className="sticky left-0 z-10 h-11 border-b bg-row-pinned px-4">
+                  <SectionLabel code="N" label="Scrap Sold (kg)" />
+                </td>
                 <td className="h-11 border-b px-1.5" colSpan={diaCols.length}>
                   <Input
                     type="number"
@@ -242,23 +320,35 @@ export function AbstractDraftPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Same order and bands as the real Abstract, so the derived
+                      figures land where the reader already expects them. */}
                   {[
-                    { code: "C", label: "Net Received", values: result.section_c_net_received },
-                    { code: "G", label: "Consumption + WIP", values: result.section_g_consumption_plus_wip },
-                    { code: "H", label: "Theoretical Stock", values: result.section_h_theoretical_stock },
-                    { code: "K", label: "Total Physical", values: result.section_k_total_physical },
-                    { code: "L", label: "Wastage Qty", values: result.section_l_wastage_qty },
-                  ].map((r) => (
-                    <tr key={r.code} className="odd:bg-row-stripe">
-                      <td className="sticky left-0 z-10 h-9 border-b bg-row-pinned px-4 font-medium text-info">
-                        {r.code} · {r.label}
-                      </td>
-                      {diaCols.map((dia) => (
-                        <td key={dia} className="tnum h-9 border-b px-2 text-right">
-                          {fmt(r.values[dia])}
+                    { code: "C", label: "Net Received", band: "Inbound", values: result.section_c_net_received },
+                    { code: "G", label: "Consumption + WIP", band: "Issued & consumed", values: result.section_g_consumption_plus_wip },
+                    { code: "H", label: "Theoretical Stock", band: "Stock", values: result.section_h_theoretical_stock },
+                    { code: "K", label: "Total Physical", band: "Stock", values: result.section_k_total_physical },
+                    { code: "L", label: "Wastage Qty", band: "Reconciliation", values: result.section_l_wastage_qty },
+                  ].map((r, i, arr) => (
+                    <Fragment key={r.code}>
+                      {(i === 0 || arr[i - 1].band !== r.band) && (
+                        <BandRow band={r.band} colSpan={diaCols.length + 1} />
+                      )}
+                      <tr className="odd:bg-row-stripe">
+                        <td className="sticky left-0 z-10 h-9 border-b bg-row-pinned px-4">
+                          <span className="flex items-baseline gap-2">
+                            <span aria-hidden className="w-3.5 shrink-0 text-[11px] font-semibold tabular-nums text-info/60">
+                              {r.code}
+                            </span>
+                            <span className="font-bold text-info">{r.label}</span>
+                          </span>
                         </td>
-                      ))}
-                    </tr>
+                        {diaCols.map((dia) => (
+                          <td key={dia} className="tnum h-9 border-b px-2 text-right">
+                            {fmt(r.values[dia])}
+                          </td>
+                        ))}
+                      </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
