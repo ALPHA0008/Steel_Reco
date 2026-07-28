@@ -94,3 +94,6 @@ scratchpad/
 # frontend/scripts/walkthrough-april.mjs. The script is tracked; its output isn't.
 walkthrough-april-2026/
 frontend/walkthrough/
+
+# Playwright MCP scratch output (snapshots/console logs per session)
+.playwright-mcp/
