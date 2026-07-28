@@ -332,6 +332,11 @@ export interface ExceptionLog {
   validated_at: string | null
   /** How many times a promised follow-up lapsed and the row came back. */
   reopened_count: number
+  /** Who decided, and in what capacity. Site logins are shared per project, so
+   *  the name is typed by the person while the role comes from their session.
+   *  Null on rows resolved before this was captured. */
+  resolver_name: string | null
+  resolver_role: string | null
 }
 
 // ---- Dashboard ----

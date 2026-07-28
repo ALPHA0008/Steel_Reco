@@ -14,6 +14,7 @@ from app.services.exception_service import (
     CorrectionNotVerified,
     FollowUpDateInvalid,
     FollowUpDateRequired,
+    ResolverNameRequired,
 )
 from app.services.month_close_service import (
     AlreadyFinalized,
@@ -99,6 +100,13 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_envelope("correction_not_verified", str(exc)),
+        )
+
+    @app.exception_handler(ResolverNameRequired)
+    async def _resolver_name_required(request: Request, exc: ResolverNameRequired) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("resolver_name_required", str(exc)),
         )
 
     @app.exception_handler(FollowUpDateRequired)

@@ -131,7 +131,7 @@ async def test_reopen_lifts_lock_and_refinalize_creates_new_snapshot_keeping_old
         rr = await app_client.post(
             f"/api/v1/exceptions/{exc['id']}/resolve",
             headers=auth_headers,
-            json={"resolution_type": "approved", "reason": "no upstream doc for this back-dated test GRN"},
+            json={"resolution_type": "approved", "resolver_name": "Ramesh Kumar", "reason": "no upstream doc for this back-dated test GRN"},
         )
         assert rr.status_code == 200, rr.text
 

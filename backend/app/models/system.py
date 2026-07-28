@@ -129,3 +129,11 @@ class ExceptionLog(UUIDPkMixin, Base):
     validation_state: Mapped[str | None] = mapped_column(String(20))
     validated_at: Mapped[datetime | None] = mapped_column()
     reopened_count: Mapped[int] = mapped_column(default=0, server_default="0")
+
+    # Who actually decided (migration 0012). resolved_by identifies the login,
+    # but site accounts are shared per project and the person behind them
+    # changes shift to shift -- so the name is entered, while the role is taken
+    # from the authenticated session rather than typed (it is a fact about the
+    # account, not a claim). NULL on rows resolved before this was captured.
+    resolver_name: Mapped[str | None] = mapped_column(String(120))
+    resolver_role: Mapped[str | None] = mapped_column(String(40))

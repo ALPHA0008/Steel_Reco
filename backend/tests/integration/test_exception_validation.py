@@ -107,7 +107,7 @@ async def test_corrected_is_refused_while_the_rule_still_fails(
     resp = await app_client.post(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
-        json={"resolution_type": "corrected", "reason": "trust me, I fixed it"},
+        json={"resolution_type": "corrected", "resolver_name": "Ramesh Kumar", "reason": "trust me, I fixed it"},
     )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "correction_not_verified"
@@ -147,7 +147,7 @@ async def test_corrected_is_accepted_and_marked_verified_once_the_data_is_fixed(
     resp = await app_client.post(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
-        json={"resolution_type": "corrected", "reason": "missing GRN 4471 was entered"},
+        json={"resolution_type": "corrected", "resolver_name": "Ramesh Kumar", "reason": "missing GRN 4471 was entered"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -171,7 +171,7 @@ async def test_approved_resolves_but_is_recorded_as_a_conscious_override(
     resp = await app_client.post(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
-        json={"resolution_type": "approved", "reason": "opening stock predates the system"},
+        json={"resolution_type": "approved", "resolver_name": "Ramesh Kumar", "reason": "opening stock predates the system"},
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "resolved"
@@ -189,7 +189,7 @@ async def test_approved_requires_a_reason(app_client, seeded_project, auth_heade
     resp = await app_client.post(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
-        json={"resolution_type": "approved", "reason": ""},
+        json={"resolution_type": "approved", "resolver_name": "Ramesh Kumar", "reason": ""},
     )
     assert resp.status_code == 422  # schema min_length=1
 
@@ -207,7 +207,7 @@ async def test_follow_up_without_a_date_is_refused(
     resp = await app_client.post(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
-        json={"resolution_type": "follow_up", "reason": "will check with the store"},
+        json={"resolution_type": "follow_up", "resolver_name": "Ramesh Kumar", "reason": "will check with the store"},
     )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "follow_up_date_required"
@@ -230,7 +230,7 @@ async def test_follow_up_date_beyond_the_close_horizon_is_refused(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
         json={
-            "resolution_type": "follow_up",
+            "resolution_type": "follow_up", "resolver_name": "Ramesh Kumar",
             "reason": "sometime next year",
             "follow_up_due_date": far_out.isoformat(),
         },
@@ -254,7 +254,7 @@ async def test_follow_up_parks_as_pending_and_does_not_resolve(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
         json={
-            "resolution_type": "follow_up",
+            "resolution_type": "follow_up", "resolver_name": "Ramesh Kumar",
             "reason": "store to confirm the physical count",
             "follow_up_due_date": due.isoformat(),
         },
@@ -288,7 +288,7 @@ async def test_overdue_follow_up_reopens_with_a_warning_naming_the_missed_date(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
         json={
-            "resolution_type": "follow_up",
+            "resolution_type": "follow_up", "resolver_name": "Ramesh Kumar",
             "reason": "store to confirm",
             "follow_up_due_date": due.isoformat(),
         },
@@ -317,6 +317,124 @@ async def test_overdue_follow_up_reopens_with_a_warning_naming_the_missed_date(
 
 
 @pytest.mark.asyncio
+async def test_resolving_without_a_name_is_refused_on_every_path(
+    app_client, seeded_project, auth_headers, superuser_session
+):
+    """Site logins are shared per project ("qs_testproject"), so the account
+    cannot answer "who decided this?". Every path has to be signed."""
+    vendor_id, contractor_id, dia_id = await _seed_masters(superuser_session)
+    await _grn(app_client, auth_headers, vendor_id, dia_id, 1000)
+    await _overstock_issue(app_client, auth_headers, contractor_id, dia_id, 5000)
+
+    exc = await _find_exception(app_client, auth_headers, "issue_exceeds_stock")
+    soon = (date.today() + timedelta(days=3)).isoformat()
+
+    for payload in (
+        {"resolution_type": "approved", "reason": "fine by me"},
+        {"resolution_type": "corrected", "reason": "sorted it"},
+        {"resolution_type": "follow_up", "reason": "later", "follow_up_due_date": soon},
+    ):
+        resp = await app_client.post(
+            f"/api/v1/exceptions/{exc['id']}/resolve", headers=auth_headers, json=payload
+        )
+        assert resp.status_code == 422, f"{payload['resolution_type']} was accepted unsigned: {resp.text}"
+
+    # Whitespace is not a signature either.
+    blank = await app_client.post(
+        f"/api/v1/exceptions/{exc['id']}/resolve",
+        headers=auth_headers,
+        json={"resolution_type": "approved", "resolver_name": "   ", "reason": "fine by me"},
+    )
+    assert blank.status_code == 422
+
+    # ...and the row is untouched by any of those attempts.
+    row = (
+        await superuser_session.execute(
+            text("SELECT status, resolver_name FROM exception_log WHERE id = :id"), {"id": exc["id"]}
+        )
+    ).one()
+    assert row.status == "open"
+    assert row.resolver_name is None
+
+
+@pytest.mark.asyncio
+async def test_signature_records_the_typed_name_and_the_session_role(
+    app_client, seeded_project, auth_headers, superuser_session
+):
+    """The name is entered (the person changes shift to shift); the role comes
+    from the authenticated session, so it cannot be overstated by the client."""
+    vendor_id, contractor_id, dia_id = await _seed_masters(superuser_session)
+    await _grn(app_client, auth_headers, vendor_id, dia_id, 1000)
+    await _overstock_issue(app_client, auth_headers, contractor_id, dia_id, 5000)
+
+    exc = await _find_exception(app_client, auth_headers, "issue_exceeds_stock")
+
+    resp = await app_client.post(
+        f"/api/v1/exceptions/{exc['id']}/resolve",
+        headers=auth_headers,
+        json={
+            "resolution_type": "approved",
+            "resolver_name": "  Suresh Babu  ",  # trimmed on the way in
+            "resolver_role": "admin",  # ignored: role is not client-supplied
+            "reason": "opening stock predates the system",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["resolver_name"] == "Suresh Babu"
+    assert body["resolver_role"] == "QS"  # from the token, NOT the "admin" above
+
+    # The signature is in the audit trail too, not only on the mutable row.
+    audit = (
+        await superuser_session.execute(
+            text(
+                "SELECT after_json FROM audit_log WHERE table_name = 'exception_log' "
+                "AND row_id = :id ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"id": exc["id"]},
+        )
+    ).scalar_one()
+    assert audit["resolver_name"] == "Suresh Babu"
+    assert audit["resolver_role"] == "QS"
+
+
+@pytest.mark.asyncio
+async def test_overdue_warning_names_who_made_the_promise(
+    app_client, seeded_project, auth_headers, superuser_session
+):
+    """When a commitment lapses, the person who made it is named -- that is the
+    useful fact when deciding who to chase."""
+    vendor_id, contractor_id, dia_id = await _seed_masters(superuser_session)
+    await _grn(app_client, auth_headers, vendor_id, dia_id, 1000)
+    await _overstock_issue(app_client, auth_headers, contractor_id, dia_id, 5000)
+
+    exc = await _find_exception(app_client, auth_headers, "issue_exceeds_stock")
+    due = date.today() + timedelta(days=2)
+    park = await app_client.post(
+        f"/api/v1/exceptions/{exc['id']}/resolve",
+        headers=auth_headers,
+        json={
+            "resolution_type": "follow_up",
+            "resolver_name": "Priya Nair",
+            "reason": "store to confirm",
+            "follow_up_due_date": due.isoformat(),
+        },
+    )
+    assert park.status_code == 200, park.text
+
+    await superuser_session.execute(text("SET app.user_role = 'admin'"))
+    await superuser_session.execute(
+        text("UPDATE exception_log SET follow_up_due_date = :d WHERE id = :id"),
+        {"d": date.today() - timedelta(days=1), "id": exc["id"]},
+    )
+    await superuser_session.commit()
+
+    listed = await app_client.get("/api/v1/exceptions?status=open", headers=auth_headers)
+    reopened = next(e for e in listed.json() if e["id"] == exc["id"])
+    assert "committed by Priya Nair" in reopened["message"]
+
+
+@pytest.mark.asyncio
 async def test_finalize_is_blocked_by_open_and_by_pending_exceptions(
     app_client, seeded_project, auth_headers, superuser_session
 ):
@@ -342,7 +460,7 @@ async def test_finalize_is_blocked_by_open_and_by_pending_exceptions(
         f"/api/v1/exceptions/{exc['id']}/resolve",
         headers=auth_headers,
         json={
-            "resolution_type": "follow_up",
+            "resolution_type": "follow_up", "resolver_name": "Ramesh Kumar",
             "reason": "store to confirm",
             "follow_up_due_date": due.isoformat(),
         },
@@ -361,7 +479,7 @@ async def test_finalize_is_blocked_by_open_and_by_pending_exceptions(
         approved = await app_client.post(
             f"/api/v1/exceptions/{pending['id']}/resolve",
             headers=auth_headers,
-            json={"resolution_type": "approved", "reason": "opening stock predates the system"},
+            json={"resolution_type": "approved", "resolver_name": "Ramesh Kumar", "reason": "opening stock predates the system"},
         )
         assert approved.status_code == 200, approved.text
 

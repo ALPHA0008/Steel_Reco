@@ -231,12 +231,17 @@ export function useResolveException() {
       /** Required for follow_up; the backend refuses a past date or one beyond
        *  the close horizon, so a rejection here is expected, not exceptional. */
       follow_up_due_date?: string
+      /** Who is deciding. Required on every path — site logins are shared, so
+       *  the account cannot identify the person. The role is NOT sent: the
+       *  backend takes it from the session so it can't be overstated. */
+      resolver_name: string
     }) =>
       (
         await api.post<ExceptionLog>(`/exceptions/${p.id}/resolve`, {
           resolution_type: p.resolution_type,
           reason: p.reason,
           follow_up_due_date: p.follow_up_due_date ?? null,
+          resolver_name: p.resolver_name,
         })
       ).data,
     onSuccess: () => {

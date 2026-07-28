@@ -16,6 +16,12 @@ class CorrectionNotVerified(DomainError):
     on the strength of the claim alone."""
 
 
+class ResolverNameRequired(DomainError):
+    """A resolution with no named person behind it. -> HTTP 422. Site accounts
+    are shared per project, so "resolved by qs_testproject" records a login, not
+    a decision-maker."""
+
+
 class FollowUpDateRequired(DomainError):
     """follow_up with no target date. -> HTTP 422. An open-ended "I'll get to
     it" is exactly what this is meant to stop."""
@@ -54,10 +60,19 @@ class ExceptionService:
                     two rules above.
     """
 
-    def __init__(self, session: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
+        user_role: str | None = None,
+    ) -> None:
         self._session = session
         self._project_id = project_id
         self._user_id = user_id
+        # From the authenticated session, never from the request body -- a
+        # self-declared role would be a claim rather than a fact.
+        self._user_role = user_role
         self._repo = ExceptionRepository(session, project_id=project_id)
         self._revalidator = ExceptionRevalidationService(session, project_id)
         self._audit = AuditService(session)
@@ -81,12 +96,25 @@ class ExceptionService:
         resolution_type: str,
         reason: str,
         follow_up_due_date: date | None = None,
+        resolver_name: str | None = None,
     ) -> ExceptionLog:
         row = await self._repo.get(exception_id)
         if row is None:
             raise NotFoundError(f"exception_log {exception_id} not found")
 
         now = datetime.now(timezone.utc)
+
+        # Every path is signed. Site logins are shared per project, so
+        # resolved_by names an account and not a person; without this the audit
+        # trail cannot say who actually made the call.
+        signed_name = (resolver_name or "").strip()
+        if not signed_name:
+            raise ResolverNameRequired(
+                "Who is making this decision? Site logins are shared, so the record needs the "
+                "name of the person deciding, not just the account."
+            )
+        row.resolver_name = signed_name
+        row.resolver_role = self._user_role
 
         if resolution_type == "follow_up":
             self._validate_follow_up_date(follow_up_due_date)
@@ -148,6 +176,11 @@ class ExceptionService:
                 "validation_state": row.validation_state,
                 "follow_up_due_date": row.follow_up_due_date.isoformat() if row.follow_up_due_date else None,
                 "detail": detail,
+                # The signature belongs in the audit row too -- exception_log
+                # holds only the latest decision, so without this a name is lost
+                # the moment an overdue follow-up is re-answered by someone else.
+                "resolver_name": row.resolver_name,
+                "resolver_role": row.resolver_role,
             },
         )
         await self._session.commit()
@@ -191,9 +224,14 @@ class ExceptionService:
             row.status = "open"
             row.reopened_count = (row.reopened_count or 0) + 1
             row.validation_state = None
+            # resolver_name is deliberately NOT cleared: it names whoever made
+            # the promise that lapsed, which is the useful thing to know when it
+            # comes back. Whoever answers it next overwrites it, and the audit
+            # log keeps both.
+            promised_by = f" by {row.resolver_name}" if row.resolver_name else ""
             row.message = (
-                f"{row.message or ''}\n[Overdue] This was committed for {missed} and is still "
-                "unresolved. Decide now: correct the record, or approve it as-is with a reason."
+                f"{row.message or ''}\n[Overdue] This was committed{promised_by} for {missed} and is "
+                "still unresolved. Decide now: correct the record, or approve it as-is with a reason."
             ).strip()
         if overdue:
             await self._session.flush()

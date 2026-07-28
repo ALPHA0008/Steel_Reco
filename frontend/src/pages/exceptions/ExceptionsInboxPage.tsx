@@ -9,6 +9,7 @@ import {
   CalendarClock,
   ShieldCheck,
   RotateCcw,
+  UserRound,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Page, PageHeader } from "@/components/app/page"
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { useExceptions, useResolveException } from "@/lib/queries"
 import { apiErrorCode, apiErrorMessage } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import type { ExceptionLog, ExceptionResolutionType } from "@/lib/types"
 
 const RESOLUTION_LABEL: Record<ExceptionResolutionType, string> = {
@@ -63,6 +65,7 @@ const MotionCard = motion.create(Card)
 
 export function ExceptionsInboxPage() {
   const reduceMotion = useReducedMotion()
+  const { user } = useAuth()
   const [tab, setTab] = useState<"open" | "resolved">("open")
   const [sev, setSev] = useState<SevFilter>("all")
   const exceptions = useExceptions(tab)
@@ -284,6 +287,15 @@ export function ExceptionsInboxPage() {
                           </span>
                         )}
                       </p>
+                      {/* Who decided. The account is shared per project, so this
+                          is the only line that names a person. */}
+                      {exc.resolver_name && (exc.status === "resolved" || parked) && (
+                        <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <UserRound className="size-3" />
+                          <span className="font-medium text-foreground">{exc.resolver_name}</span>
+                          {exc.resolver_role && <span>· {exc.resolver_role}</span>}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {(exc.status === "open" || parked) && (
@@ -360,9 +372,10 @@ export function ExceptionsInboxPage() {
         resolutionType={resolutionType}
         pending={resolve.isPending}
         rejection={rejection}
+        role={user?.role}
         onDismissRejection={() => setRejection(null)}
         onOpenChange={(open) => !open && setTarget(null)}
-        onConfirm={(reason, followUpDueDate) => {
+        onConfirm={(reason, resolverName, followUpDueDate) => {
           if (!target) return
           setRejection(null)
           resolve.mutate(
@@ -370,6 +383,7 @@ export function ExceptionsInboxPage() {
               id: target.id,
               resolution_type: resolutionType,
               reason,
+              resolver_name: resolverName,
               follow_up_due_date: followUpDueDate,
             },
             {
@@ -392,7 +406,8 @@ export function ExceptionsInboxPage() {
                 const recoverable =
                   code === "correction_not_verified" ||
                   code === "follow_up_date_required" ||
-                  code === "follow_up_date_invalid"
+                  code === "follow_up_date_invalid" ||
+                  code === "resolver_name_required"
                 if (recoverable) {
                   setRejection(apiErrorMessage(err, "That could not be accepted."))
                   return

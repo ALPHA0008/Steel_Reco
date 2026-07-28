@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { ShieldCheck, CalendarClock, CircleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Field } from "./field"
 import { Banner } from "./banner"
@@ -69,6 +70,7 @@ export function ExceptionResolveDialog({
   resolutionType,
   pending,
   rejection,
+  role,
   onDismissRejection,
   onOpenChange,
   onConfirm,
@@ -78,12 +80,19 @@ export function ExceptionResolveDialog({
   pending?: boolean
   /** Message from a refused attempt (e.g. the re-check still fails). */
   rejection?: string | null
+  /** The signed-in account's role, shown read-only. Displayed rather than
+   *  entered because it is a fact about the session, not a claim — and it is
+   *  never sent to the server, which reads it from the token itself. */
+  role?: string
   onDismissRejection: () => void
   onOpenChange: (open: boolean) => void
-  onConfirm: (reason: string, followUpDueDate?: string) => void
+  onConfirm: (reason: string, resolverName: string, followUpDueDate?: string) => void
 }) {
   const [reason, setReason] = useState("")
   const [due, setDue] = useState("")
+  const [name, setName] = useState("")
+  const nameFieldId = useId()
+  const nameHelpId = `${nameFieldId}-help`
 
   const today = new Date()
   const minDate = isoDate(today)
@@ -94,13 +103,17 @@ export function ExceptionResolveDialog({
   useEffect(() => {
     setReason("")
     setDue("")
+    setName("")
   }, [exception?.id, resolutionType])
 
   const copy = COPY[resolutionType]
   const Icon = copy.icon
   const needsDate = resolutionType === "follow_up"
   const disabled =
-    pending || reason.trim().length === 0 || (needsDate && due.length === 0)
+    pending ||
+    reason.trim().length === 0 ||
+    name.trim().length < 2 ||
+    (needsDate && due.length === 0)
 
   return (
     <Dialog
@@ -190,6 +203,45 @@ export function ExceptionResolveDialog({
           )}
         />
 
+        {/* The signature sits last, immediately above the action: you sign
+            after reading the finding and writing the reason, not before. */}
+        <div className="border-t border-border pt-4">
+          {/* Name and role sit on one row, aligned on the controls themselves —
+              the helper text below spans both so the two inputs stay level. */}
+          <div className="flex items-start gap-3">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor={nameFieldId}>
+                Decided by
+                <span aria-hidden className="text-danger">
+                  *
+                </span>
+              </Label>
+              <Input
+                id={nameFieldId}
+                aria-required
+                aria-describedby={nameHelpId}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Full name"
+                autoComplete="off"
+              />
+            </div>
+            {/* Read-only: taken from the signed-in session, not typed, and not
+                sent to the server (which reads the role from the token). */}
+            <div className="space-y-2">
+              <Label asChild>
+                <span>Role</span>
+              </Label>
+              <div className="flex h-9 items-center rounded-md border border-border bg-muted px-3 text-[13px] font-medium text-muted-foreground">
+                {role ?? "—"}
+              </div>
+            </div>
+          </div>
+          <p id={nameHelpId} className="mt-2 text-xs text-muted-foreground">
+            Site logins are shared, so name the person making this call.
+          </p>
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
@@ -197,7 +249,7 @@ export function ExceptionResolveDialog({
           <Button
             className="bg-brand text-brand-foreground hover:bg-brand-hover"
             disabled={disabled}
-            onClick={() => onConfirm(reason.trim(), needsDate ? due : undefined)}
+            onClick={() => onConfirm(reason.trim(), name.trim(), needsDate ? due : undefined)}
           >
             {pending ? "Checking…" : copy.cta}
           </Button>

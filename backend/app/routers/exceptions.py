@@ -16,8 +16,8 @@ async def list_exceptions(
     session: ScopedSession,
     status_filter: str | None = Query(None, alias="status"),
 ) -> list[ExceptionLogResponse]:
-    user_id, _role = current_user
-    service = ExceptionService(session, project_id, user_id)
+    user_id, role = current_user
+    service = ExceptionService(session, project_id, user_id, user_role=role)
     rows = await service.list(status_filter)
     return [ExceptionLogResponse.model_validate(r) for r in rows]
 
@@ -30,12 +30,14 @@ async def resolve_exception(
     current_user: CurrentUser,
     session: ScopedSession,
 ) -> ExceptionLogResponse:
-    user_id, _role = current_user
-    service = ExceptionService(session, project_id, user_id)
+    user_id, role = current_user
+    # The role is taken from the verified token, never from the payload.
+    service = ExceptionService(session, project_id, user_id, user_role=role)
     row = await service.resolve(
         exception_id,
         payload.resolution_type,
         payload.reason,
         follow_up_due_date=payload.follow_up_due_date,
+        resolver_name=payload.resolver_name,
     )
     return ExceptionLogResponse.model_validate(row)
