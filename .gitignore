@@ -89,3 +89,8 @@ docs_scanned_M99.pdf
 TestProject/
 scratchpad/
 
+
+# Walkthrough recordings: 13MB of video/screenshots per run, regenerable via
+# frontend/scripts/walkthrough-april.mjs. The script is tracked; its output isn't.
+walkthrough-april-2026/
+frontend/walkthrough/
