@@ -22,6 +22,14 @@ class IssueExceedsStockRule(BaseRule):
         mode = RuleMode(ctx.thresholds.get("mode", self.default_mode.value))
 
         passed = requested <= available
+        # A negative "available" means the books are already short for this dia
+        # (issues on record exceed receipts). Printing "available stock of
+        # -8500kg" reads as nonsense to a QS, so an overdrawn balance is stated
+        # as the shortfall it actually is.
+        if available < 0:
+            stock_phrase = f"stock is already short by {-available}kg"
+        else:
+            stock_phrase = f"available stock is {available}kg"
         return RuleResult(
             rule_id=self.rule_id,
             passed=passed,
@@ -29,8 +37,6 @@ class IssueExceedsStockRule(BaseRule):
             threshold=available,
             actual_value=requested,
             message=(
-                ""
-                if passed
-                else f"Issue of {requested}kg exceeds available stock of {available}kg for this diameter"
+                "" if passed else f"Issue of {requested}kg exceeds stock for this diameter — {stock_phrase}"
             ),
         )

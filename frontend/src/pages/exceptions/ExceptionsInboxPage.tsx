@@ -31,6 +31,21 @@ const RESOLUTION_LABEL: Record<ExceptionResolutionType, string> = {
   follow_up: "Marked for follow-up",
 }
 
+/** Where the flagged row lives, named the way a QS says it rather than by
+ *  table name — "store_issue" and "grn" are our schema, not their vocabulary. */
+const SOURCE_LABEL: Record<string, string> = {
+  grn: "GRN",
+  store_issue: "Store Issue",
+  inter_site_transfer: "Transfer",
+  physical_count: "Physical Count",
+  scrap_sale: "Scrap Sale",
+  jmr_actual: "JMR",
+  bbs_plan: "BBS",
+  purchase_order: "Purchase Order",
+  supplier_invoice: "Supplier Invoice",
+  myhome_stock: "MyHome Stock",
+}
+
 /** Severity filter: All / just the blocking ones / just advisories. */
 type SevFilter = "all" | "blocking" | "advisory"
 
@@ -237,7 +252,7 @@ export function ExceptionsInboxPage() {
                         </span>
                         {exc.transaction_table && (
                           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                            {exc.transaction_table}
+                            {SOURCE_LABEL[exc.transaction_table] ?? exc.transaction_table.replaceAll("_", " ")}
                           </span>
                         )}
                         {parked && (

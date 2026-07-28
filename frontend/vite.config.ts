@@ -16,7 +16,10 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        // Defaults to the normal dev backend. Override with VITE_API_TARGET to
+        // point the dev server at a throwaway instance (e.g. a sandbox DB on
+        // another port) without editing this file.
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
       },
     },

@@ -111,7 +111,10 @@ export function ExceptionResolveDialog({
       }}
     >
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+        {/* Left-aligned even on mobile: the shadcn default centres the header,
+            which makes this dialog's multi-line explanation harder to read and
+            inconsistent with the left-aligned fields under it. */}
+        <DialogHeader className="text-left">
           <DialogTitle className="flex items-center gap-2">
             <span
               className={cn(

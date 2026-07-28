@@ -78,7 +78,7 @@ async def test_advisory_mode_allows_overstock_issue_with_warning(
     assert issue_resp.status_code == 201
     body = issue_resp.json()
     assert body["warning"] is not None
-    assert "exceeds available stock" in body["warning"]
+    assert "exceeds stock for this diameter" in body["warning"]
 
 
 @pytest.mark.asyncio
@@ -217,4 +217,4 @@ async def test_earlier_issues_are_subtracted_even_with_no_returns(
     assert second.status_code == 201
     warning = second.json()["warning"]
     assert warning is not None, "the first issue was not subtracted from available stock"
-    assert "exceeds available stock of 200" in warning
+    assert "available stock is 200" in warning

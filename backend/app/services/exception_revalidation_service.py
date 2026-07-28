@@ -87,11 +87,14 @@ class ExceptionRevalidationService:
                 passed=True,
                 detail="Re-ran the original check against current data: it now passes.",
             )
+        # rstrip + explicit '.' so the rule's own message runs into the advice
+        # as a sentence, whether or not that message ends in punctuation.
+        finding = result.message.rstrip().rstrip(".")
         return RevalidationOutcome(
             checkable=True,
             passed=False,
             detail=(
-                f"Re-ran the original check against current data and it STILL fails: {result.message} "
+                f"Re-ran the original check against current data and it STILL fails: {finding}. "
                 "Correct the underlying record, or approve it as-is with a reason."
             ),
         )

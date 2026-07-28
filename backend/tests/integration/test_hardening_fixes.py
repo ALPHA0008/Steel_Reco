@@ -74,7 +74,7 @@ async def test_transfer_out_exceeding_stock_gets_advisory_warning(
     )
     assert resp.status_code == 201
     assert resp.json()["warning"] is not None
-    assert "exceeds available stock" in resp.json()["warning"]
+    assert "exceeds stock for this diameter" in resp.json()["warning"]
 
     await superuser_session.execute(text("SET app.user_role = 'admin'"))
     count = (

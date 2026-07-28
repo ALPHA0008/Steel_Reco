@@ -34,6 +34,12 @@ class TransferExceedsStockRule(BaseRule):
         mode = RuleMode(ctx.thresholds.get(self.rule_id, {}).get("mode", self.default_mode.value))
 
         passed = requested <= available
+        # See issue_exceeds_stock: an overdrawn balance is reported as a
+        # shortfall rather than a negative "available" figure.
+        if available < 0:
+            stock_phrase = f"stock is already short by {-available}kg"
+        else:
+            stock_phrase = f"available stock is {available}kg"
         return RuleResult(
             rule_id=self.rule_id,
             passed=passed,
@@ -43,7 +49,7 @@ class TransferExceedsStockRule(BaseRule):
             message=(
                 ""
                 if passed
-                else f"Transfer out of {requested}kg exceeds available stock of "
-                f"{available}kg for this diameter -- lending steel this site never received"
+                else f"Transfer out of {requested}kg exceeds stock for this diameter — "
+                f"{stock_phrase}; lending steel this site never received"
             ),
         )
