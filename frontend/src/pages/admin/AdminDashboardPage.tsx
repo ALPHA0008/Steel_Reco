@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
 import { useAdminAnalytics } from "@/lib/queries"
 import type { AnalyticsSite } from "@/lib/types"
+import type { ContributionUnit } from "@/components/app/charts/contribution-donut"
 
 // Six visualisations pulling in recharts (~343KB) and leaflet. Imported
 // statically, none of the page -- not even the KPI tiles -- could paint until
@@ -42,6 +43,11 @@ const RiskHeatmap = lazy(() =>
 )
 const LeafletSiteMap = lazy(() =>
   import("@/components/app/charts/leaflet-site-map").then((m) => ({ default: m.LeafletSiteMap })),
+)
+const ContributionDonut = lazy(() =>
+  import("@/components/app/charts/contribution-donut").then((m) => ({
+    default: m.ContributionDonut,
+  })),
 )
 
 /** Placeholder while a chart's chunk is in flight. Takes the height the chart
@@ -288,10 +294,28 @@ export function AdminDashboardPage() {
 }
 
 type ParetoKey = "wastage" | "scrap" | "exceptions"
-const PARETO_META: Record<ParetoKey, { label: string; sub: string }> = {
-  wastage: { label: "Wastage", sub: "Which sites drive total wastage" },
-  scrap: { label: "Scrap", sub: "Which sites drive scrap" },
-  exceptions: { label: "Exceptions", sub: "Which sites drive open flags" },
+const PARETO_META: Record<
+  ParetoKey,
+  { label: string; sub: string; unit: ContributionUnit; totalLabel: string }
+> = {
+  wastage: {
+    label: "Wastage",
+    sub: "Share of portfolio wastage by site · click a slice to filter",
+    unit: "MT",
+    totalLabel: "Total wastage",
+  },
+  scrap: {
+    label: "Scrap",
+    sub: "Share of portfolio scrap by site · click a slice to filter",
+    unit: "MT",
+    totalLabel: "Total scrap",
+  },
+  exceptions: {
+    label: "Exceptions",
+    sub: "Share of open flags by site · click a slice to filter",
+    unit: "count",
+    totalLabel: "Open flags",
+  },
 }
 
 /** The three contribution Pareto views (wastage/scrap/exceptions), consolidated
@@ -310,7 +334,6 @@ function ContributionPareto({
 }) {
   const [key, setKey] = useState<ParetoKey>("wastage")
   const rows = data.pareto[key]
-  const top = rows[0]?.value || 1
 
   return (
     <Panel title={`${PARETO_META[key].label} contribution`} sub={PARETO_META[key].sub}>
@@ -329,27 +352,16 @@ function ContributionPareto({
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
-        {rows.map((r) => {
-          const site = allSites.find((s) => s.name === r.name)
-          return (
-            <button
-              key={r.name}
-              type="button"
-              onClick={() => site && onToggleFilter(site)}
-              className={cn("block w-full rounded-lg p-1.5 text-left transition-colors hover:bg-row-hover", siteId && site?.project_id === siteId && "bg-brand-subtle")}
-            >
-              <div className="mb-1 flex items-center justify-between text-[12px]">
-                <span className="truncate font-medium">{r.name}</span>
-                <span className="tnum text-muted-foreground">{r.cumulative_pct.toFixed(0)}% cumulative</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-brand/70" style={{ width: `${(r.value / top) * 100}%` }} />
-              </div>
-            </button>
-          )
-        })}
-      </div>
+      <Suspense fallback={<ChartFallback height={210} />}>
+        <ContributionDonut
+          rows={rows}
+          allSites={allSites}
+          unit={PARETO_META[key].unit}
+          totalLabel={PARETO_META[key].totalLabel}
+          activeId={siteId}
+          onToggleFilter={onToggleFilter}
+        />
+      </Suspense>
     </Panel>
   )
 }

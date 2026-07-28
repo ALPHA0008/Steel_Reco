@@ -83,6 +83,24 @@
   --chart-3: #00652c;
   --chart-4: #7f4b00;
   --chart-5: #6b6a6b;
+
+  /* Categorical series, for charts where the SITE is the subject (the
+     contribution donut). Six slots because six sites; assigned by site
+     identity in a fixed order, never by rank, so cross-filtering never
+     repaints the survivors.
+
+     Not the --chart-N set above: that one is five slots, includes a true gray
+     (#6b6a6b, chroma 0.002 — reads as "no data", not as a category), and its
+     brown/green pair sits at deltaE 4.4 under protanopia, i.e.
+     indistinguishable. This set is validated end-to-end for a white surface:
+     lightness band, chroma floor, CVD separation, normal-vision floor and
+     contrast all pass. Re-run the check before changing any value. */
+  --series-1: #a62522;
+  --series-2: #0f6fa8;
+  --series-3: #00713f;
+  --series-4: #8a5cc4;
+  --series-5: #9a6a00;
+  --series-6: #c02a7a;
 }
 
 .dark {
@@ -154,6 +172,17 @@
   --chart-3: #69ca7e;
   --chart-4: #f2a64d;
   --chart-5: #9c9a9c;
+
+  /* Dark-mode series: re-picked against the dark card surface, not lightened
+     copies of the light set. Dark wants a lower lightness band than light
+     (0.48-0.67 vs 0.43-0.77), so the light values sit above it and the obvious
+     "brighten for dark" move fails outright. Validated against #1d1e1f. */
+  --series-1: #f04a3f;
+  --series-2: #4a91cc;
+  --series-3: #35a566;
+  --series-4: #9a72d8;
+  --series-5: #bd8a28;
+  --series-6: #d4589a;
 }
 
 @theme inline {
@@ -216,6 +245,13 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
