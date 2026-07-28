@@ -34,7 +34,7 @@ const EXPECT = {
 
 // Alternates deliberately, and revisits, so a stale entry from any earlier
 // session would surface.
-const SEQUENCE = ["qs_apas", "qs_testproject", "qs_apas", "qs_grava", "qs_testproject"]
+const SEQUENCE = (process.env.SEQ || "qs_apas,qs_testproject,qs_apas,qs_testproject,qs_apas,qs_grava,qs_testproject,qs_apas").split(",")
 
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })

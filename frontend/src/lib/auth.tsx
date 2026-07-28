@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -54,6 +55,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [])
+
+  // Backstop: clear the cache whenever the signed-in identity changes, however
+  // that happened. login()/logout() already clear at the two obvious points,
+  // but those are explicit calls that a future code path could bypass -- a
+  // token swapped in from elsewhere, a session restored as a different user.
+  // Because the cache keys are per-resource rather than per-user, missing one
+  // such path means showing one person another's project, so this watches the
+  // identity itself instead of trusting every caller to remember.
+  //
+  // Skipped when the cache is already empty, so the normal login flow (which
+  // cleared a moment earlier) doesn't clear twice and refetch needlessly.
+  const lastIdentity = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const id = user?.id ?? null
+    if (lastIdentity.current === id) return
+    const isFirstObservation = lastIdentity.current === undefined
+    lastIdentity.current = id
+    if (isFirstObservation) return
+    if (qc.getQueryCache().getAll().length > 0) qc.clear()
+  }, [user?.id, qc])
 
   const login = useCallback(
     async (username: string, password: string) => {
