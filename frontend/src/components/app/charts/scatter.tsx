@@ -46,6 +46,39 @@ export function ScatterChart({
   const y = (v: number) => padT + plotH - (v / maxY) * plotH
   const r = (exc: number) => 9 + (exc / maxExc) * 20
 
+  // Label placement, resolved before drawing.
+  //
+  // Every label used to sit directly above its own bubble, which fails as soon
+  // as two sites land in the same place: Nishada (51.2k MT, 5.74%) and Sayuk
+  // (54.4k, 5.79%) printed their names on top of one another and neither could
+  // be read. Each label now takes the first free slot -- above the bubble, else
+  // below it -- and any that still collides is dropped rather than overprinted.
+  // Dropping is safe because the hover card names every point, and a chart with
+  // most points labelled beats one where two are illegible.
+  const labelY = new Map<string, number>()
+  {
+    const taken: Array<{ x1: number; x2: number; y1: number; y2: number }> = []
+    // Biggest bubbles first: they are the ones a reader looks at, so they get
+    // first claim on the space.
+    for (const s of [...pts].sort((a, b) => b.open_exceptions - a.open_exceptions)) {
+      const cx = x(s.received_mt)
+      const cy = y(s.wastage_pct ?? 0)
+      const rad = r(s.open_exceptions)
+      const halfW = Math.max(16, s.name.length * 2.7)
+      for (const dy of [-(rad + 5), rad + 13]) {
+        const box = { x1: cx - halfW, x2: cx + halfW, y1: cy + dy - 9, y2: cy + dy + 3 }
+        const clash = taken.some(
+          (t) => box.x1 < t.x2 && box.x2 > t.x1 && box.y1 < t.y2 && box.y2 > t.y1,
+        )
+        if (!clash) {
+          taken.push(box)
+          labelY.set(s.project_id, cy + dy)
+          break
+        }
+      }
+    }
+  }
+
   const yTicks = [...new Set([0, capPct, Math.round(maxY / 2), Math.round(maxY)])]
   const xMid = maxX / 2
   const xTicks = [...new Set([0, Math.round(xMid), Math.round(maxX)])]
@@ -112,9 +145,17 @@ export function ScatterChart({
                 </circle>
               )}
               <circle cx={cx} cy={cy} r={rad} fill={color} fillOpacity={isActive ? 0.55 : 0.3} stroke={color} strokeWidth={isActive ? 2.5 : 1.75} />
-              <text x={cx} y={cy - rad - 5} textAnchor="middle" className="fill-foreground text-[9.5px] font-semibold" opacity={dim ? 0 : 0.9}>
-                {s.name}
-              </text>
+              {labelY.has(s.project_id) && (
+                <text
+                  x={cx}
+                  y={labelY.get(s.project_id)}
+                  textAnchor="middle"
+                  className="fill-foreground text-[9.5px] font-semibold"
+                  opacity={dim ? 0 : 0.9}
+                >
+                  {s.name}
+                </text>
+              )}
             </g>
           )
         })}

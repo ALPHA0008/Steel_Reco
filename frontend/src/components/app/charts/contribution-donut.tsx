@@ -180,24 +180,27 @@ export function ContributionDonut({
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      {/* Capped and centred rather than filling the panel. Left to stretch, the
-          spotlight became a ~1000px letterbox and object-cover threw away most
-          of each photograph's height to fill it. */}
-      <div className="mx-auto flex max-w-[860px] flex-col items-center gap-6 @3xl:flex-row @3xl:items-stretch @3xl:gap-7">
+      {/* Three columns once there is room: donut, spotlight, legend.
+          Capping the row and leaving the right third empty was the previous
+          shape, and it read as an unfinished panel. Giving the legend its own
+          column uses that width for something, and lets the spotlight grow tall
+          enough to stay near 2.7:1 instead of stretching into a letterbox that
+          crops away most of each photograph. */}
+      <div className="flex flex-col items-center gap-6 @3xl:flex-row @3xl:items-stretch @3xl:gap-7">
         {/* ---- Donut ---- */}
         <div className="relative shrink-0 self-center">
-          <ChartContainer config={config} className="aspect-square h-[212px] w-[212px]">
+          <ChartContainer config={config} className="aspect-square h-[236px] w-[236px]">
             <PieChart>
               <Pie
                 data={slices}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={64}
-                outerRadius={96}
+                innerRadius={72}
+                outerRadius={107}
                 // The spotlit slice lifts out of the ring. Recharts animates
                 // between radii, so this reads as a rise rather than a jump.
                 activeIndex={index}
-                activeShape={{ outerRadius: 105 }}
+                activeShape={{ outerRadius: 117 }}
                 // 2px of surface between segments: the boundary reads as a
                 // boundary without a stroke calling attention to itself.
                 paddingAngle={1.5}
@@ -249,7 +252,7 @@ export function ContributionDonut({
             // layout the container is flex-col, where flex-1 resolves to
             // flex-basis:0% on the HEIGHT -- it overrode the explicit height and
             // collapsed the whole card to a hairline on mobile.
-            "group relative h-[212px] w-full min-w-0 overflow-hidden rounded-2xl text-left @3xl:h-[244px] @3xl:flex-1",
+            "group relative h-[212px] w-full min-w-0 overflow-hidden rounded-2xl text-left @3xl:h-[300px] @3xl:flex-1",
             "border border-border/60 bg-muted",
             "transition-transform duration-150 ease-out active:scale-[0.995]",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -415,15 +418,14 @@ export function ContributionDonut({
             />
           )}
         </button>
-      </div>
 
-      {/* ---- Chip rail: legend and navigation in one ---- */}
-      <div
+        {/* ---- Chip rail: legend and navigation in one ---- */}
+        <div
         ref={railRef}
         role="tablist"
         aria-label="Sites by contribution"
         onKeyDown={onRailKeyDown}
-        className="mt-5 flex flex-wrap items-center gap-1.5"
+        className="mt-5 flex flex-wrap items-center gap-1.5 @3xl:mt-0 @3xl:w-[178px] @3xl:shrink-0 @3xl:flex-col @3xl:items-stretch @3xl:justify-center @3xl:gap-1"
       >
         {slices.map((s, i) => {
           const isActive = i === index
@@ -458,6 +460,7 @@ export function ContributionDonut({
             </button>
           )
         })}
+        </div>
       </div>
     </div>
   )

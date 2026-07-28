@@ -206,6 +206,23 @@ export function AdminDashboardPage() {
           </div>
         )}
 
+        {/* ============ Contribution: who drives the totals above ============
+            Sits here, directly under the KPI row and the site gallery, rather
+            than at the foot of the page. The executive summary opens by naming
+            the site that drives the portfolio ("led by Sayuk, which alone drives
+            38% of total wastage") and this is the evidence for that claim -- it
+            was ~3,300px below the sentence it supports, past five other
+            sections, which almost nobody scrolls to. One Pareto card with three
+            tabs, rather than three parallel boxes repeating a layout. */}
+        {q.isLoading || !data ? (
+          <Skeleton className="mb-10 h-[420px] rounded-2xl" />
+        ) : (
+          <div className="mb-10">
+            <SectionTitle>Portfolio contribution</SectionTitle>
+            <ContributionPareto data={data} allSites={allSites} siteId={siteId} onToggleFilter={toggleFilter} />
+          </div>
+        )}
+
         {/* ============ Intelligence hub: insights + actions + alerts + activity ============ */}
         {q.isLoading || !data ? (
           <Skeleton className="mb-10 h-[380px] rounded-2xl" />
@@ -282,10 +299,6 @@ export function AdminDashboardPage() {
               </Panel>
             </div>
 
-            {/* ============ Contribution panels: one Pareto card, three tabs, instead
-                of three parallel bordered boxes repeating the same layout. ============ */}
-            <SectionTitle>Portfolio contribution</SectionTitle>
-            <ContributionPareto data={data} allSites={allSites} siteId={siteId} onToggleFilter={toggleFilter} />
           </>
         )}
       </Page>
