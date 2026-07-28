@@ -272,7 +272,32 @@ export function ContributionDonut({
                 <img
                   src={active.image}
                   alt=""
-                  className="h-full w-full object-cover"
+                  // Zoomed and anchored to the top, which is what makes these
+                  // images usable at all. Three of the five are report covers
+                  // with "QUALITY OBSERVATION REPORT" and a display headline
+                  // baked into the artwork between roughly 43% and 80% of the
+                  // height -- Grava's runs three quarters of the way across --
+                  // and the top ~42% of every one of them is clean architecture.
+                  //
+                  // object-cover alone cannot get there: this card is wider than
+                  // the source, so cover scales by width and shows the full
+                  // width with ~70% of the height, straight through the type.
+                  // Scaling from the top narrows that window to the clean band.
+                  // Still above 1:1 pixel density at this size, so nothing softens.
+                  //
+                  // 1.72 is chosen, not eyeballed. Cover shows ~70% of the source
+                  // height, so a scale of S shows 70/S; the type starts at ~43%,
+                  // which makes 1.63 the break-even point. 1.62 happened to look
+                  // clean on today's five images while sitting a fraction of a
+                  // percent from clipping type -- 1.72 lands at 40% and leaves
+                  // room for the next image that follows the same template.
+                  //
+                  // The cost is real and accepted: Nishada and Sayuk are clean
+                  // renders that would frame better centred, and this crops past
+                  // Nishada's canopy walkway. One safe rule for every image beats
+                  // per-file focal metadata that goes stale the moment someone
+                  // swaps a photo.
+                  className="h-full w-full origin-top scale-[1.72] object-cover object-top"
                   decoding="async"
                 />
               ) : (
@@ -289,25 +314,24 @@ export function ContributionDonut({
             </motion.div>
           </AnimatePresence>
 
-          {/* A light wash for depth, nothing more. The heavy two-layer scrim
-              this replaced was doing the frosted panel's job as well, and its
-              mid-stop showed up as a dark band straight across the photograph. */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/10" />
+          {/* Legibility gradient. Deep at the base where the figures sit and
+              fading to nothing well before the top, so it reads as evening light
+              on the building rather than a panel laid over it. `to-transparent`
+              at 60% specifically: any darkening carried to the very top made the
+              upper edge look dirty against the card border. */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.9)_0%,rgba(0,0,0,0.72)_22%,rgba(0,0,0,0.28)_42%,transparent_60%)]" />
 
           {/* Figures. Keyed to the site so they re-enter with it, staggered just
               enough to read as one movement rather than four. */}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={active.id}
-              // The figures sit on their own frosted panel rather than straight
-              // on the gradient. Some of these site renders are marketing
-              // collateral with the project name and report titles baked into
-              // the artwork -- Grava's is a report cover -- and no gradient
-              // alone keeps a 26px number legible over that. A blurred, tinted
-              // panel separates overlay from photograph whatever the photograph
-              // happens to be, which is the only version of this that holds for
-              // images nobody has vetted.
-              className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-black/45 p-4 backdrop-blur-md @sm:p-5"
+              // No hard-edged panel. The frosted slab this replaced drew a
+              // visible seam across the photograph, and with the baked-in type
+              // now cropped out of frame it has nothing left to mask. The
+              // gradient below carries legibility instead, which keeps the image
+              // reading as one picture rather than a picture with a lid on it.
+              className="absolute inset-x-0 bottom-0 p-4 @sm:p-5"
               initial="hidden"
               animate="shown"
               exit="hidden"
