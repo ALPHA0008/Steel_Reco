@@ -24,6 +24,18 @@ export default defineConfig({
       },
     },
   },
+  // `vite preview` needs its own proxy -- it does not inherit server.proxy. Without
+  // this the production build can't reach the API, so the only measurable numbers
+  // were dev-server ones, where hundreds of unbundled modules make load times
+  // meaningless. Same target and override.
+  preview: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

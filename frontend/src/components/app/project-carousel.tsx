@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   motion,
   useMotionValue,
@@ -40,39 +40,103 @@ export function ProjectCarousel({
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
+  // Which directions still have content. Drives both the arrow disabled states
+  // and the edge fades: without them the last card just looked clipped, as
+  // though the layout were broken, rather than "there is more to the right".
+  const [atStart, setAtStart] = useState(true)
+  const [atEnd, setAtEnd] = useState(true)
+
+  const syncEdges = useCallback(() => {
+    const el = trackRef.current
+    if (!el) return
+    const first = el.firstElementChild
+    const last = el.lastElementChild
+    if (!first || !last) {
+      setAtStart(true)
+      setAtEnd(true)
+      return
+    }
+    // Measured as "is the first/last card fully in view?" rather than from
+    // scrollLeft. With snap-mandatory plus the track's own gap and padding the
+    // resting scrollLeft is never 0 (it sits at 16px here), so a
+    // `scrollLeft <= 1` test reported "not at the start" the moment the page
+    // loaded and left the back arrow enabled with nowhere to go. Comparing
+    // rects is immune to whatever padding, gap or snap alignment the track uses.
+    const track = el.getBoundingClientRect()
+    setAtStart(first.getBoundingClientRect().left >= track.left - 1)
+    setAtEnd(last.getBoundingClientRect().right <= track.right + 1)
+  }, [])
+
+  useEffect(() => {
+    syncEdges()
+    const el = trackRef.current
+    if (!el) return
+    // Also re-check on resize: a card can stop being clipped when the window
+    // widens, at which point the arrows and fades should disappear.
+    const ro = new ResizeObserver(syncEdges)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [syncEdges, sites.length])
 
   const scrollBy = (dx: number) => trackRef.current?.scrollBy({ left: dx, behavior: "smooth" })
+  const scrollable = !(atStart && atEnd)
 
   return (
     <div className="relative">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Your sites</h2>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => scrollBy(-340)}
-            className="grid size-7 place-items-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-row-hover hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollBy(340)}
-            className="grid size-7 place-items-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-row-hover hover:text-foreground"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+        {/* Hidden entirely when everything already fits -- controls that can't
+            do anything are worse than no controls. */}
+        {scrollable && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Scroll to previous sites"
+              disabled={atStart}
+              onClick={() => scrollBy(-340)}
+              className="grid size-7 place-items-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-row-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Scroll to more sites"
+              disabled={atEnd}
+              onClick={() => scrollBy(340)}
+              className="grid size-7 place-items-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-row-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
 
-      <div
-        ref={trackRef}
-        className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
-        style={{ scrollbarWidth: "none", perspective: 1200 }}
-      >
-        {sites.map((s, i) => (
-          <SiteCard key={s.project_id} site={s} index={i} onOpen={onOpen} reduce={!!reduce} />
-        ))}
+      <div className="relative">
+        <div
+          ref={trackRef}
+          onScroll={syncEdges}
+          className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
+          style={{ scrollbarWidth: "none", perspective: 1200 }}
+        >
+          {sites.map((s, i) => (
+            <SiteCard key={s.project_id} site={s} index={i} onOpen={onOpen} reduce={!!reduce} />
+          ))}
+        </div>
+
+        {/* Edge fades, pointer-events-none so they never block a card click.
+            They read as "the row continues" instead of a cut-off card. */}
+        {!atStart && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent"
+          />
+        )}
+        {!atEnd && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent"
+          />
+        )}
       </div>
     </div>
   )
@@ -128,7 +192,13 @@ function SiteCard({
       onMouseLeave={handleMouseLeave}
       initial={reduce ? false : { opacity: 0, scale: 0.9, y: 24, filter: "blur(6px)" }}
       whileInView={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, amount: 0.4 }}
+      // amount was 0.4, which required 40% of a card to be visible vertically.
+      // On a 900px-tall window the row lands ~38% in view, just under the
+      // threshold -- so with `once: true` the cards stayed at opacity 0 and the
+      // section looked empty until you happened to scroll. An entrance
+      // animation must never be the reason content is missing: a small amount
+      // plus a bottom margin starts it just before the row is reached.
+      viewport={{ once: true, amount: 0.1, margin: "0px 0px 120px 0px" }}
       transition={{ duration: 0.55, delay: Math.min(index, 6) * 0.07, ease: [0.23, 1, 0.32, 1] }}
       whileTap={{ scale: 0.97 }}
       style={{
@@ -144,7 +214,22 @@ function SiteCard({
         style={{ x: reduce ? 0 : imgX, y: reduce ? 0 : imgY, scale: 1.08, transformStyle: "preserve-3d" }}
       >
         {img ? (
-          <img src={img} alt={s.name} className="h-full w-full object-cover" />
+          <img
+            src={img}
+            alt={s.name}
+            // The first two cards are above the fold, so they load eagerly and
+            // get fetch priority; the rest wait until scrolled toward. Before
+            // this, every site's hero competed on first paint and the last card
+            // in the row (Grava) reliably lost.
+            loading={index < 2 ? "eager" : "lazy"}
+            fetchPriority={index < 2 ? "high" : "low"}
+            decoding="async"
+            // Intrinsic size prevents a reflow when the image lands, and tells
+            // the browser it never needs more than the card's own width.
+            width={240}
+            height={300}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand to-[#7a0016]">
             <Building2 className="size-10 text-white/25" />

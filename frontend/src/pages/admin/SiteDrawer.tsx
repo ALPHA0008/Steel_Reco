@@ -55,7 +55,12 @@ export function SiteDrawer({
                 strong bottom-up scrim so our overlaid title reads cleanly. */}
             <div className="relative h-52 w-full shrink-0 overflow-hidden">
               {img ? (
-                <img src={img} alt={site.name} className="h-full w-full object-cover object-center" />
+                <img
+                  src={img}
+                  alt={site.name}
+                  decoding="async"
+                  className="h-full w-full object-cover object-center"
+                />
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-brand to-[#7a0016]" />
               )}

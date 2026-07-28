@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { lazy, Suspense, useMemo } from "react"
 import { Link } from "react-router-dom"
 import {
   ArrowLeftRight,
@@ -18,7 +18,13 @@ import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
-import { WastageTrendArea } from "@/components/app/wastage-trend-area"
+// Recharts is ~343KB -- a third of the whole app. Imported statically it had to
+// download and parse before the dashboard could paint at all, which is why the
+// KPIs appeared to wait on the chart. Loading it on demand lets the numbers
+// render immediately and the curve arrive a moment later behind its skeleton.
+const WastageTrendArea = lazy(() =>
+  import("@/components/app/wastage-trend-area").then((m) => ({ default: m.WastageTrendArea })),
+)
 import {
   useDashboardSummary,
   useDiaGrades,
@@ -199,10 +205,14 @@ export function DashboardPage() {
           <Skeleton className="m-5 h-[220px] rounded-lg" />
         ) : wastageTrend.data && wastageTrend.data.points.length > 0 ? (
           <div className="p-5">
-            <WastageTrendArea
-              points={wastageTrend.data.points}
-              capPct={parseFloat(wastageTrend.data.contract_wastage_cap_pct)}
-            />
+            {/* Same skeleton as the data-loading state, so a slow chunk on a
+                cold cache looks like loading rather than a layout jump. */}
+            <Suspense fallback={<Skeleton className="h-[220px] rounded-lg" />}>
+              <WastageTrendArea
+                points={wastageTrend.data.points}
+                capPct={parseFloat(wastageTrend.data.contract_wastage_cap_pct)}
+              />
+            </Suspense>
           </div>
         ) : (
           <EmptyState

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react"
 import { AlertTriangle, ArrowLeftRight, Building2, PackageOpen, Recycle, TriangleAlert, X } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
@@ -12,17 +12,44 @@ import { CommandPalette } from "@/components/app/command-palette"
 import { SiteExplorer } from "@/pages/admin/SiteExplorer"
 import { SiteDrawer } from "@/pages/admin/SiteDrawer"
 import { FilterContext, applyFilter } from "@/pages/admin/dashboard-filter"
-import { PortfolioTrend } from "@/components/app/charts/portfolio-trend"
-import { SankeyFlow } from "@/components/app/charts/sankey"
-import { ScatterChart } from "@/components/app/charts/scatter"
-import { SteelDistributionBars } from "@/components/app/charts/steel-distribution"
-import { RiskHeatmap } from "@/components/app/charts/heatmap"
-import { LeafletSiteMap } from "@/components/app/charts/leaflet-site-map"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
 import { useAdminAnalytics } from "@/lib/queries"
 import type { AnalyticsSite } from "@/lib/types"
+
+// Six visualisations pulling in recharts (~343KB) and leaflet. Imported
+// statically, none of the page -- not even the KPI tiles -- could paint until
+// all of it had downloaded and parsed, which is what made this screen sit on
+// skeletons. Each now loads on demand behind its own fallback, so the numbers
+// and site cards appear immediately and the charts fill in as they arrive.
+const PortfolioTrend = lazy(() =>
+  import("@/components/app/charts/portfolio-trend").then((m) => ({ default: m.PortfolioTrend })),
+)
+const SankeyFlow = lazy(() =>
+  import("@/components/app/charts/sankey").then((m) => ({ default: m.SankeyFlow })),
+)
+const ScatterChart = lazy(() =>
+  import("@/components/app/charts/scatter").then((m) => ({ default: m.ScatterChart })),
+)
+const SteelDistributionBars = lazy(() =>
+  import("@/components/app/charts/steel-distribution").then((m) => ({
+    default: m.SteelDistributionBars,
+  })),
+)
+const RiskHeatmap = lazy(() =>
+  import("@/components/app/charts/heatmap").then((m) => ({ default: m.RiskHeatmap })),
+)
+const LeafletSiteMap = lazy(() =>
+  import("@/components/app/charts/leaflet-site-map").then((m) => ({ default: m.LeafletSiteMap })),
+)
+
+/** Placeholder while a chart's chunk is in flight. Takes the height the chart
+ *  will occupy so nothing below it jumps when the real thing mounts. */
+function ChartFallback({ height = 240 }: { height?: number }) {
+  return <Skeleton className="w-full rounded-lg" style={{ height }} />
+}
+
 
 /** A subheading for a section — no heavy card chrome, just rhythm. */
 function SectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
@@ -123,7 +150,9 @@ export function AdminDashboardPage() {
                 <span className="text-[11px] text-muted-foreground">click a pin to filter</span>
               </div>
               <div className="mb-3 text-[11.5px] text-muted-foreground">Real coordinates</div>
-              <LeafletSiteMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
+              <Suspense fallback={<ChartFallback height={272} />}>
+                <LeafletSiteMap sites={allSites} height={272} activeId={siteId} onOpen={toggleFilter} />
+              </Suspense>
             </Card>
           </div>
         )}
@@ -208,13 +237,17 @@ export function AdminDashboardPage() {
             <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
               <Panel title="Portfolio wastage trend & forecast" sub="Monthly mean across reporting sites · 3-mo moving average · next-month projection">
                 {data.portfolio_trend.length >= 2 ? (
-                  <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
+                  <Suspense fallback={<ChartFallback />}>
+                    <PortfolioTrend points={data.portfolio_trend} forecast={data.portfolio_forecast_pct} />
+                  </Suspense>
                 ) : (
                   <div className="py-12 text-center text-[13px] text-muted-foreground">Not enough history for a trend yet.</div>
                 )}
               </Panel>
               <Panel title="Material flow" sub={`Received → issued → consumed → scrap (MT)${filteredSite ? ` · ${filteredSite.name}` : ""}`}>
-                <SankeyFlow received={agg.recv} issued={agg.issued} consumed={sites.reduce((a, s) => a + s.consumed_mt, 0)} scrap={agg.scrap} balance={agg.recv - sites.reduce((a, s) => a + s.consumed_mt, 0) - agg.scrap} />
+                <Suspense fallback={<ChartFallback />}>
+                  <SankeyFlow received={agg.recv} issued={agg.issued} consumed={sites.reduce((a, s) => a + s.consumed_mt, 0)} scrap={agg.scrap} balance={agg.recv - sites.reduce((a, s) => a + s.consumed_mt, 0) - agg.scrap} />
+                </Suspense>
               </Panel>
             </div>
 
@@ -222,10 +255,14 @@ export function AdminDashboardPage() {
                 horizontal room to stay legible, so it leads a 3:2 split. */}
             <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-[3fr_2fr]">
               <Panel title="Steel distribution" sub="Steel received by site · ranked · color = health · click to filter">
-                <SteelDistributionBars sites={allSites} activeId={siteId} onOpen={toggleFilter} />
+                <Suspense fallback={<ChartFallback />}>
+                  <SteelDistributionBars sites={allSites} activeId={siteId} onOpen={toggleFilter} />
+                </Suspense>
               </Panel>
               <Panel title="Volume vs wastage" sub="click a bubble to filter">
-                <ScatterChart sites={allSites} activeId={siteId} onOpen={toggleFilter} />
+                <Suspense fallback={<ChartFallback />}>
+                  <ScatterChart sites={allSites} activeId={siteId} onOpen={toggleFilter} />
+                </Suspense>
               </Panel>
             </div>
 
@@ -233,7 +270,9 @@ export function AdminDashboardPage() {
                 for 15 months and 6 sites without squeezing cells. */}
             <div className="mb-5">
               <Panel title="Risk heatmap" sub="Wastage intensity by site & month · click a site to filter">
-                <RiskHeatmap sites={allSites} onOpen={toggleFilter} />
+                <Suspense fallback={<ChartFallback height={300} />}>
+                  <RiskHeatmap sites={allSites} onOpen={toggleFilter} />
+                </Suspense>
               </Panel>
             </div>
 

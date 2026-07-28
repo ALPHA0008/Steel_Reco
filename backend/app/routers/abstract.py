@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import Response
 from sqlalchemy import text
 
-from app.dependencies import ProjectScope, ScopedSession
+from app.dependencies import CurrentUser, ProjectScope, ScopedSession
 from app.schemas.abstract import (
     AbstractResponse,
     DraftAbstractRequest,
@@ -29,12 +29,21 @@ async def get_period_bounds(project_id: ProjectScope, session: ScopedSession) ->
 
 
 @router.get("/wastage-trend", response_model=WastageTrendResponse)
-async def get_wastage_trend(project_id: ProjectScope, session: ScopedSession) -> WastageTrendResponse:
+async def get_wastage_trend(
+    project_id: ProjectScope, current_user: CurrentUser, session: ScopedSession
+) -> WastageTrendResponse:
     """Cumulative wastage % (Section M) as of every month-end with real
     activity -- powers the dashboard's wastage trend chart.
+
+    The caller's identity is passed through so the months can be computed
+    concurrently on their own sessions, each scoped exactly as this request is
+    (see AbstractService.get_wastage_trend).
     """
+    user_id, role = current_user
     service = AbstractService(session)
-    return await service.get_wastage_trend(project_id)
+    return await service.get_wastage_trend(
+        project_id, rls_user_id=str(user_id), rls_user_role=role
+    )
 
 
 @router.get("/data-health", response_model=DataHealthResponse)
