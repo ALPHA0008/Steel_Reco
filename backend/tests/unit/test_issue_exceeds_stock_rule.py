@@ -32,7 +32,7 @@ async def test_fails_advisory_when_exceeding_stock():
     result = await rule.evaluate(_ctx(requested=Decimal("15"), available=Decimal("10"), mode="advisory"))
     assert result.passed is False
     assert result.mode == RuleMode.ADVISORY
-    assert "exceeds available stock" in result.message
+    assert "exceeds stock for this diameter" in result.message
 
 
 @pytest.mark.asyncio

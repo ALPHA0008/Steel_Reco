@@ -31,7 +31,7 @@ export function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <section id="faq" className="relative bg-white py-24 md:py-32">
+    <section id="faq" className="relative bg-card py-24 md:py-32">
       <div className="mx-auto max-w-2xl px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -56,10 +56,10 @@ export function FaqSection() {
                 viewport={{ once: true, margin: "-40px" }}
                 transition={{ duration: 0.45, delay: i * 0.05, ease: [0.2, 0, 0, 1] }}
                 className={cn(
-                  "overflow-hidden rounded-2xl border transition-all duration-300",
+                  "overflow-hidden rounded-2xl border transition-[background-color,box-shadow,border-color] duration-300 ease-out-strong",
                   isOpen
                     ? "border-brand-border bg-brand-subtle shadow-[0_4px_16px_rgba(215,0,40,0.08)]"
-                    : "border-border bg-white shadow-[0_1px_3px_rgba(20,20,22,0.04)] hover:border-input hover:shadow-[0_4px_12px_rgba(20,20,22,0.06)]",
+                    : "border-border bg-card shadow-[0_1px_3px_rgba(20,20,22,0.04)] hover:border-input hover:shadow-[0_4px_12px_rgba(20,20,22,0.06)]",
                 )}
               >
                 <button

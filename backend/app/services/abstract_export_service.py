@@ -15,6 +15,25 @@ _COMPUTED_FONT = Font(italic=True, color="1D4ED8")
 _LABEL_FONT = Font(bold=True)
 _TITLE_FONT = Font(bold=True, size=14)
 _SUB_FONT = Font(size=10, italic=True, color="6B7280")
+_SUBROW_FONT = Font(size=10, color="6B7280")
+
+# The four reconciliation phases, colour-coded to match the on-screen Abstract:
+# steel arrives (info blue), goes out and is used (warning amber), what's left
+# on hand (success green), and the verdict (danger red).
+_BANDS: list[tuple[str, str, str, tuple[str, ...]]] = [
+    ("Inbound", "1D4ED8", "EEF4FF", ("A", "B", "C", "")),
+    ("Issued & consumed", "92400E", "FFF1E7", ("D", "E", "F", "G")),
+    ("Stock", "00652C", "E7F4EC", ("H", "I", "J", "K")),
+    ("Reconciliation", "A62522", "FFF0EF", ("L", "M", "N")),
+]
+# Which band each lettered section belongs to (sub-rows inherit from the row
+# above them, so they're resolved positionally at write time).
+_BAND_OF_CODE: dict[str, tuple[str, str, str]] = {
+    code: (name, font_hex, fill_hex)
+    for name, font_hex, fill_hex, codes in _BANDS
+    for code in codes
+    if code
+}
 
 
 def _sum_by_dia(rows: list[dict], key: str) -> dict[str, float]:
@@ -51,32 +70,41 @@ class AbstractExportService:
         H = {k: float(v) for k, v in a.section_h_theoretical_stock.items()}
         I_: dict[str, float] = {}
         J: dict[str, float] = {}
+        # Safety steel is a labeled BREAKOUT of J (display only) -- already
+        # inside cut_piece_stock_kg, so it must never be added again anywhere.
+        Safety: dict[str, float] = {}
         for row in a.sections_ij_physical_stock:
             dia = str(row["dia"])
             I_[dia] = I_.get(dia, 0.0) + float(row.get("full_length_kg") or 0)
             J[dia] = J.get(dia, 0.0) + float(row.get("cut_piece_stock_kg") or 0)
+            Safety[dia] = Safety.get(dia, 0.0) + float(row.get("safety_steel_kg") or 0)
+        MyHome = {k: float(v) for k, v in a.section_myhome_stock.items()}
         K = {k: float(v) for k, v in a.section_k_total_physical.items()}
         L = {k: float(v) for k, v in a.section_l_wastage_qty.items()}
         m_pct = float(a.section_m_wastage_pct) if a.section_m_wastage_pct is not None else None
         n_kg = float(a.section_n_scrap_sold_kg)
 
         dias = sorted(
-            {d for m in (A, B, C, D, E, F, G, H, I_, J, K, L) for d in m},
+            {d for m in (A, B, C, D, E, F, G, H, I_, J, Safety, MyHome, K, L) for d in m},
             key=lambda x: float(x),
         )
 
+        # Sub-rows carry no section letter -- they belong to the lettered row
+        # above them -- and are indented, mirroring the on-screen hierarchy.
         rows: list[tuple] = [
             ("A", "Received", A, False, None),
             ("B", "Transferred out", B, False, None),
             ("C", "Net Received", C, True, "= A - B"),
+            ("", "    Stock at My Home", MyHome, False, "steel at My Home's own yard"),
             ("D", "Issued to Contractor", D, False, "genuine sum, never = C"),
             ("E", "Consumption", E, False, None),
             ("F", "Work in Progress", F, False, None),
             ("G", "Consumption + WIP", G, True, "= E + F"),
             ("H", "Theoretical Stock", H, True, "= C - G"),
             ("I", "Physical — Full length", I_, False, None),
+            ("", "    of which, Safety Steel", Safety, False, "already inside J -- never added again"),
             ("J", "Physical — Cut pieces (stock)", J, False, None),
-            ("K", "Total Physical", K, True, "= I + J"),
+            ("K", "Total Physical", K, True, "= I + J + Stock at My Home"),
             ("L", "Wastage Qty", L, True, "= H - K"),
         ]
 
@@ -106,9 +134,29 @@ class AbstractExportService:
         tc.alignment = Alignment(horizontal="right")
 
         r = header_row + 1
+        current_band: str | None = None
         for code, label, values, computed, formula in rows:
-            label_cell = ws.cell(r, 1, f"{code} · {label}" + (f"  [{formula}]" if formula else ""))
-            label_cell.font = _COMPUTED_FONT if computed else _LABEL_FONT
+            # Emit a colour-coded band header when the phase changes. Sub-rows
+            # carry no code, so they simply stay inside the current band.
+            band = _BAND_OF_CODE.get(code)
+            if band and band[0] != current_band:
+                current_band = band[0]
+                band_fill = PatternFill(start_color=band[2], end_color=band[2], fill_type="solid")
+                for col in range(1, total_col + 1):
+                    bc = ws.cell(r, col, band[0].upper() if col == 1 else None)
+                    bc.fill = band_fill
+                    if col == 1:
+                        bc.font = Font(bold=True, size=9, color=band[1])
+                r += 1
+
+            # Sub-rows (blank code) read as a quieter continuation of the row
+            # above -- no "code ·" prefix, lighter font.
+            text = f"{code} · {label}" if code else label
+            label_cell = ws.cell(r, 1, text + (f"  [{formula}]" if formula else ""))
+            if not code:
+                label_cell.font = _SUBROW_FONT
+            else:
+                label_cell.font = _COMPUTED_FONT if computed else _LABEL_FONT
             total_mt = 0.0
             for i, dia in enumerate(dias):
                 kg = values.get(dia, 0.0)

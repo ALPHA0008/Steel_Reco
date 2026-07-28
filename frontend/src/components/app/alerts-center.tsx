@@ -3,22 +3,23 @@ import { cn } from "@/lib/utils"
 import type { AnalyticsSite } from "@/lib/types"
 
 type Level = "critical" | "warning" | "info"
-interface Alert {
+export interface Alert {
   level: Level
   title: string
   detail: string
   site: AnalyticsSite
 }
 
-const LEVEL_META: Record<Level, { icon: typeof Info; ring: string; text: string; order: number }> = {
+export const LEVEL_META: Record<Level, { icon: typeof Info; ring: string; text: string; order: number }> = {
   critical: { icon: AlertOctagon, ring: "bg-danger-subtle text-danger", text: "text-danger", order: 0 },
   warning: { icon: AlertTriangle, ring: "bg-warning-subtle text-warning", text: "text-warning", order: 1 },
   info: { icon: Info, ring: "bg-info-subtle text-info", text: "text-info", order: 2 },
 }
 
 /** Derive prioritized operational alerts from the site facts. Red is reserved
- * for genuine critical conditions (well over cap / critical risk). */
-function deriveAlerts(sites: AnalyticsSite[]): Alert[] {
+ * for genuine critical conditions (well over cap / critical risk). Exported so
+ * a consolidated hub (IntelligenceHub) can share this logic for its count badge. */
+export function deriveAlerts(sites: AnalyticsSite[]): Alert[] {
   const out: Alert[] = []
   for (const s of sites) {
     if (s.wastage_pct != null && s.wastage_pct > s.cap_pct * 1.5) {
@@ -38,6 +39,40 @@ function deriveAlerts(sites: AnalyticsSite[]): Alert[] {
   return out.sort((a, b) => LEVEL_META[a.level].order - LEVEL_META[b.level].order)
 }
 
+/** Bare alert list -- no card chrome, for embedding inside another container
+ * (e.g. IntelligenceHub's tab pane). */
+export function AlertList({ alerts, onOpen }: { alerts: Alert[]; onOpen: (s: AnalyticsSite) => void }) {
+  if (alerts.length === 0) {
+    return <div className="py-8 text-center text-[13px] text-muted-foreground">No active alerts.</div>
+  }
+  return (
+    <ul className="space-y-1.5">
+      {alerts.map((a, i) => {
+        const m = LEVEL_META[a.level]
+        const Icon = m.icon
+        return (
+          <li key={i}>
+            <button
+              type="button"
+              onClick={() => onOpen(a.site)}
+              className="flex w-full items-center gap-2.5 rounded-xl border border-border/60 px-3 py-2 text-left transition-colors hover:border-brand-border hover:bg-row-hover"
+            >
+              <span className={cn("grid size-6 shrink-0 place-items-center rounded-md", m.ring)}>
+                <Icon className="size-3.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold text-foreground">{a.title}</span>
+                <span className="block truncate text-[11.5px] text-muted-foreground">{a.detail}</span>
+              </span>
+              <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export function AlertsCenter({ sites, onOpen }: { sites: AnalyticsSite[]; onOpen: (s: AnalyticsSite) => void }) {
   const alerts = deriveAlerts(sites)
   const criticalCount = alerts.filter((a) => a.level === "critical").length
@@ -54,34 +89,7 @@ export function AlertsCenter({ sites, onOpen }: { sites: AnalyticsSite[]; onOpen
           <span className="rounded-full bg-danger px-2 py-0.5 text-[11px] font-bold text-white">{criticalCount} critical</span>
         )}
       </div>
-      {alerts.length === 0 ? (
-        <div className="py-8 text-center text-[13px] text-muted-foreground">No active alerts.</div>
-      ) : (
-        <ul className="space-y-1.5">
-          {alerts.map((a, i) => {
-            const m = LEVEL_META[a.level]
-            const Icon = m.icon
-            return (
-              <li key={i}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(a.site)}
-                  className="flex w-full items-center gap-2.5 rounded-xl border border-border/60 px-3 py-2 text-left transition-colors hover:border-brand-border hover:bg-row-hover"
-                >
-                  <span className={cn("grid size-6 shrink-0 place-items-center rounded-md", m.ring)}>
-                    <Icon className="size-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-foreground">{a.title}</span>
-                    <span className="block truncate text-[11.5px] text-muted-foreground">{a.detail}</span>
-                  </span>
-                  <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <AlertList alerts={alerts} onOpen={onOpen} />
     </div>
   )
 }

@@ -264,6 +264,24 @@ class ScrapSale(UUIDPkMixin, TenantMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
 
+class MyHomeStock(UUIDPkMixin, TenantMixin, CreatedAtMixin, Base):
+    """Steel physically sitting at My Home's own yard/store -- a THIRD
+    physical-stock bucket alongside contractor-held full-length (I) and cut
+    pieces (J). No contractor_id: this is the company's own single yard, not
+    a per-contractor holding. Same "latest snapshot per dia, never summed"
+    semantics as physical_count (migration 0010)."""
+
+    __tablename__ = "myhome_stock"
+    __table_args__ = (CheckConstraint("qty_kg >= 0", name="ck_myhome_stock_qty_nonneg"),)
+
+    dia_grade_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dia_grades.id"), nullable=False)
+    qty_kg: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    effective_date: Mapped[date] = mapped_column(nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    corrected_from_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("myhome_stock.id"))
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+
 class MonthlyAbstractSnapshot(UUIDPkMixin, TenantMixin, CreatedAtMixin, Base):
     """Immutable finalized A-N output. The only place a summary number is
     ever persisted (plan §0 core invariant). Retained across reopen/re-finalize

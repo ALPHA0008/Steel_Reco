@@ -59,6 +59,20 @@ export function apiErrorMessage(err: unknown, fallback = "Something went wrong. 
   return fallback
 }
 
+/**
+ * The ECC envelope's machine-readable `error.code`, when there is one.
+ *
+ * Lets a caller branch on *which* rejection it got rather than only showing the
+ * message — e.g. a refused correction (`correction_not_verified`) must keep its
+ * dialog open with the typed reason intact, while a genuine failure closes it.
+ */
+export function apiErrorCode(err: unknown): string | null {
+  if (axios.isAxiosError(err)) {
+    return (err.response?.data as ErrorEnvelope | undefined)?.error?.code ?? null
+  }
+  return null
+}
+
 /** Per-field messages from a FastAPI/Pydantic 422 (for inline form errors). */
 export function apiFieldErrors(err: unknown): Record<string, string> {
   const out: Record<string, string> = {}

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw } from "lucide-react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router-dom"
+import { ChevronLeft, ChevronRight, Download, Lock, RotateCcw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Page, PageHeader } from "@/components/app/page"
 import { Banner } from "@/components/app/banner"
 import { ConfirmDialog } from "@/components/app/confirm-dialog"
+import { ReconciliationFlow } from "./reconciliation-flow"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -26,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAbstract, useFinalizeMonth, useMyProject, usePeriodBounds, useReopenMonth } from "@/lib/queries"
-import { apiErrorMessage, downloadAbstractXlsx } from "@/lib/api"
+import { apiErrorCode, apiErrorMessage, downloadAbstractXlsx } from "@/lib/api"
 import type { AbstractResponse } from "@/lib/types"
 
 /**
@@ -63,6 +65,10 @@ interface AbstractRow {
   /** row whose Total cell is a single scalar (M %, N kg) */
   scalar?: string | null
   danger?: boolean
+  /** a labeled sub-line that's informational only (e.g. Safety Steel is
+   *  already inside J's total) — rendered indented/muted, excluded from
+   *  the running dia list's "is this a real section" semantics. */
+  breakout?: boolean
 }
 
 function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; dias: string[] } {
@@ -81,15 +87,20 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
   const H = fromDict(a.section_h_theoretical_stock)
   const I: ByDia = {}
   const J: ByDia = {}
+  // Safety steel is a labeled BREAKOUT of J (display only) -- it's already
+  // inside cut_piece_stock_kg, so it must never be added again anywhere.
+  const SAFETY: ByDia = {}
   a.sections_ij_physical_stock.forEach((r) => {
     addTo(I, r.dia, r.full_length_kg)
     addTo(J, r.dia, r.cut_piece_stock_kg)
+    addTo(SAFETY, r.dia, r.safety_steel_kg)
   })
+  const MYHOME = fromDict(a.section_myhome_stock)
   const K = fromDict(a.section_k_total_physical)
   const L = fromDict(a.section_l_wastage_qty)
 
   const dias = Array.from(
-    new Set([A, B, C, D, E, F, G, H, I, J, K, L].flatMap((m) => Object.keys(m))),
+    new Set([A, B, C, D, E, F, G, H, I, J, SAFETY, MYHOME, K, L].flatMap((m) => Object.keys(m))),
   ).sort((x, y) => parseFloat(x) - parseFloat(y))
 
   const m = a.section_m_wastage_pct == null ? null : parseFloat(a.section_m_wastage_pct)
@@ -98,14 +109,28 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
     { code: "A", label: "Received", values: A },
     { code: "B", label: "Transferred out", values: B },
     { code: "C", label: "Net Received", formula: "C = A − B", computed: true, values: C },
+    {
+      code: "C1",
+      label: "Stock at My Home",
+      formula: "Latest snapshot — steel at My Home's own yard, not a contractor's site",
+      values: MYHOME,
+      breakout: true,
+    },
     { code: "D", label: "Issued to Contractor", formula: "D = Σ issues out − Σ returns in (genuine sum, never = C)", values: D },
     { code: "E", label: "Consumption", values: E },
     { code: "F", label: "Work in Progress", values: F },
     { code: "G", label: "Consumption + WIP", formula: "G = E + F", computed: true, values: G },
     { code: "H", label: "Theoretical Stock", formula: "H = C − G", computed: true, values: H },
     { code: "I", label: "Physical — Full length", values: I },
+    {
+      code: "I1",
+      label: "of which, Safety Steel",
+      formula: "Already counted inside J (Cut pieces) — shown separately for visibility, never added again",
+      values: SAFETY,
+      breakout: true,
+    },
     { code: "J", label: "Physical — Cut pieces (stock)", values: J },
-    { code: "K", label: "Total Physical", formula: "K = I + J", computed: true, values: K },
+    { code: "K", label: "Total Physical", formula: "K = I + J + Stock at My Home", computed: true, values: K },
     { code: "L", label: "Wastage Qty", formula: "L = H − K", computed: true, values: L },
     {
       code: "M",
@@ -119,6 +144,29 @@ function buildRows(a: AbstractResponse, capPct: number): { rows: AbstractRow[]; 
     { code: "N", label: "Scrap Sold", values: {}, scalar: null },
   ]
   return { rows, dias }
+}
+
+/** Which of the four narrative bands each row belongs to. Turns 14 undifferentiated
+ *  stripes into a readable structure: what came in, what went out/used, what's
+ *  left, and the result. */
+const BAND_OF: Record<string, string> = {
+  A: "Inbound", B: "Inbound", C: "Inbound", C1: "Inbound",
+  D: "Issued & consumed", E: "Issued & consumed", F: "Issued & consumed", G: "Issued & consumed",
+  H: "Stock", I: "Stock", I1: "Stock", J: "Stock", K: "Stock",
+  L: "Reconciliation", M: "Reconciliation", N: "Reconciliation",
+}
+
+/** Each band gets a semantic colour so the four phases of the reconciliation
+ *  are scannable at a glance, not just readable: steel arrives (info blue),
+ *  goes out and is used (warning amber), what's left on hand (success green),
+ *  and the verdict where money leaks (danger red). Bar + tint + text, so the
+ *  cue survives greyscale printing and colour-blindness (the label still
+ *  reads) while carrying real meaning in colour. */
+const BAND_STYLE: Record<string, { bar: string; tint: string; text: string }> = {
+  Inbound: { bar: "bg-info", tint: "bg-info-subtle", text: "text-info" },
+  "Issued & consumed": { bar: "bg-warning", tint: "bg-warning-subtle", text: "text-warning" },
+  Stock: { bar: "bg-success", tint: "bg-success-subtle", text: "text-success" },
+  Reconciliation: { bar: "bg-danger", tint: "bg-danger-subtle", text: "text-danger" },
 }
 
 function fmt(kg: number | undefined, unit: "kg" | "mt"): string {
@@ -143,6 +191,9 @@ export function AbstractPage() {
   const [pickerYear, setPickerYear] = useState(year)
   const [pickerMonth, setPickerMonth] = useState(month)
   const [actionError, setActionError] = useState<string | null>(null)
+  // Set when finalize was refused specifically because exceptions are still
+  // unanswered, so the banner can link straight to the queue.
+  const [blockedByExceptions, setBlockedByExceptions] = useState(false)
   const [exporting, setExporting] = useState(false)
   const didInitFromBounds = useRef(false)
 
@@ -231,6 +282,17 @@ export function AbstractPage() {
   const periodLabel = `${MONTH_NAMES[month - 1]} ${year}`
   const scrapKg = abstract.data ? parseFloat(abstract.data.section_n_scrap_sold_kg) : 0
 
+  // Anchor totals for the flow strip — summed straight off the built rows so
+  // they always match the matrix. C = net received, G = consumed+WIP,
+  // K = total physical, L = wastage qty, M = wastage %.
+  const rowTotal = (code: string) => {
+    const r = built?.rows.find((x) => x.code === code)
+    if (!r) return 0
+    return Object.values(r.values).reduce((s, v) => s + v, 0)
+  }
+  const wastagePct =
+    abstract.data?.section_m_wastage_pct == null ? null : parseFloat(abstract.data.section_m_wastage_pct)
+
   return (
     <Page>
       <PageHeader
@@ -272,6 +334,11 @@ export function AbstractPage() {
                 <TabsTrigger value="kg">KG</TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button variant="outline" asChild>
+              <Link to="/abstract/draft">
+                <Sparkles /> Quick Draft
+              </Link>
+            </Button>
             <Button variant="outline" disabled={exporting} onClick={handleExport}>
               <Download /> {exporting ? "Exporting…" : "Export"}
             </Button>
@@ -289,8 +356,25 @@ export function AbstractPage() {
       />
 
       {actionError && (
-        <Banner variant="blocking" className="mb-4" onDismiss={() => setActionError(null)}>
+        <Banner
+          variant="blocking"
+          className="mb-4"
+          onDismiss={() => {
+            setActionError(null)
+            setBlockedByExceptions(false)
+          }}
+        >
           {actionError}
+          {/* A close blocked by unanswered exceptions is a to-do, not a dead
+              end — point at the queue that has to be cleared. */}
+          {blockedByExceptions && (
+            <Link
+              to="/exceptions"
+              className="ml-1 font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Review exceptions
+            </Link>
+          )}
         </Banner>
       )}
       {abstract.isError && (
@@ -307,6 +391,20 @@ export function AbstractPage() {
           {f.message}
         </Banner>
       ))}
+
+      {built && (
+        <ReconciliationFlow
+          netReceivedKg={rowTotal("C")}
+          consumedWipKg={rowTotal("G")}
+          physicalKg={rowTotal("K")}
+          wastageKg={rowTotal("L")}
+          wastagePct={wastagePct}
+          capPct={capPct}
+          scrapKg={scrapKg}
+          unit={unit}
+          fmt={fmt}
+        />
+      )}
 
       <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
         {abstract.isLoading || !built ? (
@@ -345,25 +443,88 @@ export function AbstractPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {built.rows.map((row) => {
+                  {built.rows.map((row, idx) => {
                     const total = Object.values(row.values).reduce((s, v) => s + v, 0)
-                    const label = (
-                      <span className={cn("font-medium", row.computed && "text-info")}>
-                        {row.code} · {row.label}
-                        {row.computed && (
-                          <span aria-hidden className="ml-1 text-[10px] text-muted-foreground">ⓕ</span>
-                        )}
+                    const band = BAND_OF[row.code]
+                    const bandStart = idx === 0 || BAND_OF[built.rows[idx - 1].code] !== band
+                    // Three typographic levels: band header (below) > lettered
+                    // section > sub-row. A sub-row has no letter of its own --
+                    // it belongs to the section above it -- so it's rendered as
+                    // an indented branch off that row rather than a peer.
+                    const label = row.breakout ? (
+                      <span className="flex items-center gap-2 pl-5">
+                        <span aria-hidden className="text-muted-foreground/40">└</span>
+                        <span className="text-[12.5px] font-medium text-muted-foreground">{row.label}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-baseline gap-2">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "w-3.5 shrink-0 text-[11px] font-semibold tabular-nums",
+                            row.computed ? "text-info/60" : "text-muted-foreground/60",
+                          )}
+                        >
+                          {row.code}
+                        </span>
+                        <span className={cn("font-bold", row.computed && "text-info")}>
+                          {row.label}
+                          {row.computed && (
+                            <span aria-hidden className="ml-1 text-[10px] text-muted-foreground">ⓕ</span>
+                          )}
+                        </span>
                       </span>
                     )
                     return (
+                      <Fragment key={row.code}>
+                      {bandStart && (
+                        <tr className={BAND_STYLE[band]?.tint}>
+                          <td
+                            colSpan={built.dias.length + 2}
+                            className={cn(
+                              "sticky left-0 border-b border-t px-0",
+                              // The first band sits right under the column
+                              // header, so it needs less top room than the ones
+                              // that break up the flow mid-table.
+                              idx === 0 ? "h-9" : "h-10",
+                            )}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              {/* Solid colour bar keeps the band identifiable
+                                  even where the tint is nearly invisible. */}
+                              <span
+                                aria-hidden
+                                className={cn("h-4 w-1 shrink-0 rounded-r", BAND_STYLE[band]?.bar)}
+                              />
+                              <span
+                                className={cn(
+                                  "text-[11.5px] font-extrabold uppercase tracking-[0.12em]",
+                                  BAND_STYLE[band]?.text,
+                                )}
+                              >
+                                {band}
+                              </span>
+                            </span>
+                          </td>
+                        </tr>
+                      )}
                       <tr
-                        key={row.code}
                         className={cn(
                           "transition-colors odd:bg-row-stripe hover:bg-row-hover",
                           row.danger && "bg-danger-subtle font-semibold text-danger odd:bg-danger-subtle hover:bg-danger-subtle",
+                          // Sub-rows read quieter than their parent section but
+                          // their figures stay fully legible -- only the label
+                          // is de-emphasised, not the data.
+                          row.breakout && "text-[12.5px]",
                         )}
                       >
-                        <td className={cn("sticky left-0 z-10 h-9 border-b bg-row-pinned px-4", row.danger && "bg-danger-subtle text-danger")}>
+                        <td
+                          className={cn(
+                            "sticky left-0 z-10 border-b bg-row-pinned px-4",
+                            row.breakout ? "h-8" : "h-9",
+                            row.danger && "bg-danger-subtle text-danger",
+                          )}
+                        >
                           {row.formula ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -377,12 +538,37 @@ export function AbstractPage() {
                             label
                           )}
                         </td>
-                        {built.dias.map((d) => (
-                          <td key={d} className="tnum h-9 border-b px-4 text-right">
-                            {row.scalar !== undefined ? "—" : fmt(row.values[d], unit)}
-                          </td>
-                        ))}
-                        <td className={cn("tnum sticky right-0 z-10 h-9 border-b bg-row-pinned px-4 text-right font-semibold", row.danger && "bg-danger-subtle text-danger")}>
+                        {built.dias.map((d) => {
+                          // Wastage row (L): tint each cell by how much of the
+                          // total wastage sits in that diameter, so the worst
+                          // offenders pop without reading every number.
+                          const v = row.values[d]
+                          const isL = row.code === "L"
+                          const share = isL && total > 0 && v != null && v > 0 ? v / total : 0
+                          return (
+                            <td
+                              key={d}
+                              className={cn(
+                                "tnum relative border-b px-4 text-right",
+                                row.breakout ? "h-8 text-muted-foreground" : "h-9",
+                              )}
+                              style={
+                                isL && share > 0
+                                  ? { background: `color-mix(in srgb, var(--warning) ${Math.round(share * 55)}%, transparent)` }
+                                  : undefined
+                              }
+                            >
+                              {row.scalar !== undefined ? "—" : fmt(row.values[d], unit)}
+                            </td>
+                          )
+                        })}
+                        <td
+                          className={cn(
+                            "tnum sticky right-0 z-10 border-b bg-row-pinned px-4 text-right",
+                            row.breakout ? "h-8 font-medium text-muted-foreground" : "h-9 font-semibold",
+                            row.danger && "bg-danger-subtle text-danger",
+                          )}
+                        >
                           {row.code === "M"
                             ? row.scalar
                             : row.code === "N"
@@ -390,6 +576,7 @@ export function AbstractPage() {
                               : fmt(total, unit)}
                         </td>
                       </tr>
+                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -468,6 +655,7 @@ export function AbstractPage() {
         pending={finalize.isPending}
         onConfirm={() => {
           setActionError(null)
+          setBlockedByExceptions(false)
           finalize.mutate(
             { year, month },
             {
@@ -477,6 +665,7 @@ export function AbstractPage() {
               },
               onError: (err) => {
                 setFinalizeOpen(false)
+                setBlockedByExceptions(apiErrorCode(err) === "unanswered_exceptions")
                 setActionError(apiErrorMessage(err, "Could not finalize the month."))
               },
             },

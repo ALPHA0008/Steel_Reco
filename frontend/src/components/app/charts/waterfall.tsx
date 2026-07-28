@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 
 interface Step {
@@ -10,6 +11,7 @@ interface Step {
  * (or built up) step by step. Totals sit on the baseline; deltas float at the
  * running level. Pure SVG, no chart lib. */
 export function WaterfallChart({ steps, height = 240 }: { steps: Step[]; height?: number }) {
+  const reduce = useReducedMotion()
   // Compute running levels
   let running = 0
   const bars = steps.map((s) => {
@@ -53,7 +55,22 @@ export function WaterfallChart({ steps, height = 240 }: { steps: Step[]; height?
                 vectorEffect="non-scaling-stroke"
               />
             )}
-            <rect x={x} y={top} width={w} height={h} rx={1.2} fill={color} opacity={0.9} />
+            {/* Grow each bar up from its own baseline on mount. scaleY on the
+                fill-box (not the element box) keeps the corner radius crisp and
+                avoids the flash of an un-painted rect. */}
+            <motion.rect
+              x={x}
+              y={top}
+              width={w}
+              height={h}
+              rx={1.2}
+              fill={color}
+              opacity={0.9}
+              style={{ transformBox: "fill-box", transformOrigin: "bottom" }}
+              initial={reduce ? false : { scaleY: 0, opacity: 0 }}
+              animate={{ scaleY: 1, opacity: 0.9 }}
+              transition={{ duration: 0.5, delay: i * 0.08, ease: [0.23, 1, 0.32, 1] }}
+            />
           </g>
         )
       })}

@@ -262,6 +262,24 @@ export interface PhysicalCount {
   cut_pieces: Array<CutPieceCreate & { id: string }>
 }
 
+// ---- MyHome Stock (steel at My Home's own yard, not a contractor's) ----
+
+export interface MyHomeStockCreate {
+  dia_grade_id: string
+  qty_kg: string
+  effective_date: string
+  notes?: string | null
+}
+
+export interface MyHomeStock extends Omit<MyHomeStockCreate, "notes"> {
+  id: string
+  project_id: string
+  notes: string | null
+  corrected_from_id: string | null
+  created_by: string
+  created_at: string
+}
+
 // ---- Scrap ----
 
 export interface ScrapSaleCreate {
@@ -283,7 +301,14 @@ export interface ScrapSale extends Omit<ScrapSaleCreate, "notes"> {
 
 // ---- Exceptions (rules-engine output, plan §6) ----
 
-export type ExceptionStatus = "open" | "resolved" | "dismissed"
+/** "pending" = a follow-up was promised for a date that hasn't arrived yet. It
+ *  is NOT resolved: it still shows in the open queue and still blocks a close. */
+export type ExceptionStatus = "open" | "pending" | "resolved" | "dismissed"
+
+/** How a resolution was established: "verified" = the original rule was re-run
+ *  and now passes; "accepted" = a human knowingly signed it off as-is;
+ *  "pending" = awaiting a promised follow-up date. */
+export type ExceptionValidationState = "verified" | "accepted" | "pending"
 export type ExceptionResolutionType = "approved" | "corrected" | "follow_up"
 
 export interface ExceptionLog {
@@ -302,6 +327,16 @@ export interface ExceptionLog {
   resolved_by: string | null
   resolved_at: string | null
   created_at: string
+  follow_up_due_date: string | null
+  validation_state: ExceptionValidationState | null
+  validated_at: string | null
+  /** How many times a promised follow-up lapsed and the row came back. */
+  reopened_count: number
+  /** Who decided, and in what capacity. Site logins are shared per project, so
+   *  the name is typed by the person while the role comes from their session.
+   *  Null on rows resolved before this was captured. */
+  resolver_name: string | null
+  resolver_role: string | null
 }
 
 // ---- Dashboard ----
@@ -376,6 +411,25 @@ export interface AnalyticsSite {
   trend: AnalyticsTrendPoint[]
 }
 
+export interface AnalyticsNarrative {
+  grade: string
+  health: number
+  health_wow_delta_pp: number
+  wastage_pct: number | null
+  forecast_pct: number | null
+  driver_site: string | null
+  driver_project_id: string | null
+  driver_share_pct: number
+  target_wastage_pct: number
+  sites_over_cap: number
+  site_count: number
+  headline: string
+  next_step: string
+  savings_mt_per_pp: number
+  savings_inr_per_pp: number
+  steel_price_inr_per_mt: number
+}
+
 export interface AnalyticsInsight {
   severity: "info" | "warning" | "critical"
   title: string
@@ -421,6 +475,7 @@ export interface AdminAnalytics {
     open_exceptions: number
   }
   sites: AnalyticsSite[]
+  narrative: AnalyticsNarrative
   portfolio_trend: { year: number; month: number; wastage_pct: number; moving_avg: number | null }[]
   portfolio_forecast_pct: number | null
   insights: AnalyticsInsight[]
@@ -487,6 +542,7 @@ export interface AbstractSectionIJRow {
   full_length_kg: string | null
   cut_piece_stock_kg: string | null
   cut_piece_scrap_kg: string | null
+  safety_steel_kg: string | null
   total_physical_kg: string | null
 }
 
@@ -551,6 +607,7 @@ export interface AbstractResponse {
   section_g_consumption_plus_wip: Record<string, string>
   section_h_theoretical_stock: Record<string, string>
   sections_ij_physical_stock: AbstractSectionIJRow[]
+  section_myhome_stock: Record<string, string>
   section_k_total_physical: Record<string, string>
   section_l_wastage_qty: Record<string, string>
   section_m_wastage_pct: string | null
@@ -568,6 +625,37 @@ export interface AbstractFinding {
   actual_kg: string
   threshold_kg: string
   message: string
+}
+
+/** Quick Draft: type A/B/D/E/F/I/J/MyHome/N per diameter, get the derived
+ * C/G/H/K/L/M and the same class of plausibility checks the real Abstract
+ * runs. Nothing here is ever saved -- a scratch calculation. */
+export interface DraftAbstractRequest {
+  period_label: string
+  cap_pct: string
+  section_a_received: Record<string, string>
+  section_b_transferred: Record<string, string>
+  section_d_issued: Record<string, string>
+  section_e_consumption: Record<string, string>
+  section_f_wip: Record<string, string>
+  section_i_physical_full_length: Record<string, string>
+  section_j_physical_cut_pieces: Record<string, string>
+  section_myhome_stock: Record<string, string>
+  /** Breakout of J for display parity — never added into K. */
+  section_safety_steel: Record<string, string>
+  section_n_scrap_sold_kg: string
+}
+
+export interface DraftAbstractResponse {
+  is_draft: true
+  period_label: string
+  section_c_net_received: Record<string, string>
+  section_g_consumption_plus_wip: Record<string, string>
+  section_h_theoretical_stock: Record<string, string>
+  section_k_total_physical: Record<string, string>
+  section_l_wastage_qty: Record<string, string>
+  section_m_wastage_pct: string | null
+  findings: AbstractFinding[]
 }
 
 export interface FinalizeResponse {

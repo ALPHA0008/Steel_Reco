@@ -83,6 +83,24 @@
   --chart-3: #00652c;
   --chart-4: #7f4b00;
   --chart-5: #6b6a6b;
+
+  /* Categorical series, for charts where the SITE is the subject (the
+     contribution donut). Six slots because six sites; assigned by site
+     identity in a fixed order, never by rank, so cross-filtering never
+     repaints the survivors.
+
+     Not the --chart-N set above: that one is five slots, includes a true gray
+     (#6b6a6b, chroma 0.002 — reads as "no data", not as a category), and its
+     brown/green pair sits at deltaE 4.4 under protanopia, i.e.
+     indistinguishable. This set is validated end-to-end for a white surface:
+     lightness band, chroma floor, CVD separation, normal-vision floor and
+     contrast all pass. Re-run the check before changing any value. */
+  --series-1: #a62522;
+  --series-2: #0f6fa8;
+  --series-3: #00713f;
+  --series-4: #8a5cc4;
+  --series-5: #9a6a00;
+  --series-6: #c02a7a;
 }
 
 .dark {
@@ -103,8 +121,8 @@
   --accent: #2a2a2c;
   --accent-foreground: #eae7e9;
 
-  --destructive: #ff9b91;
-  --destructive-foreground: #2e1613;
+  --destructive: #ff5449;
+  --destructive-foreground: #2e0b08;
 
   --border: #2c2c2e;
   --input: #3a393b;
@@ -126,9 +144,12 @@
   --warning: #f2a64d;
   --warning-subtle: #2a2010;
   --warning-border: #4c3a18;
-  --danger: #ff9b91;
-  --danger-subtle: #2e1613;
-  --danger-border: #5a2a26;
+  /* Danger stays a real alarm in the dark, not a pastel: a saturated red that
+     still clears ~4.5:1 as text on the #161718 background AND reads urgent as
+     a fill/bar. The old #ff9b91 whispered; over-cap wastage must shout. */
+  --danger: #ff5449;
+  --danger-subtle: #33110d;
+  --danger-border: #7a2a24;
 
   --row-stripe: #1e1f20;
   --row-hover: #2a2a2c;
@@ -146,11 +167,22 @@
   --sidebar-border: #2c2c2e;
   --sidebar-ring: #ff6564;
 
-  --chart-1: #ff9b91;
+  --chart-1: #ff5449;
   --chart-2: #8dbaea;
   --chart-3: #69ca7e;
   --chart-4: #f2a64d;
   --chart-5: #9c9a9c;
+
+  /* Dark-mode series: re-picked against the dark card surface, not lightened
+     copies of the light set. Dark wants a lower lightness band than light
+     (0.48-0.67 vs 0.43-0.77), so the light values sit above it and the obvious
+     "brighten for dark" move fails outright. Validated against #1d1e1f. */
+  --series-1: #f04a3f;
+  --series-2: #4a91cc;
+  --series-3: #35a566;
+  --series-4: #9a72d8;
+  --series-5: #bd8a28;
+  --series-6: #d4589a;
 }
 
 @theme inline {
@@ -214,12 +246,26 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
   --shadow-card: var(--shadow-card);
+
+  /* Motion curves (emil-design-eng): the built-in CSS easings are too weak.
+     These give UI interactions the punch that reads as intentional. Exposed
+     as Tailwind utilities: ease-out-strong, ease-in-out-strong, ease-drawer. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --font-sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   /* Landing display face — Fraunces (variable serif). Marketing surface only;
@@ -279,7 +325,29 @@
 }
 .metric-float { animation: metric-float var(--float-dur, 9s) ease-in-out infinite; animation-delay: var(--float-delay, 0s); }
 
+/* Entrance for lists that appear as a set (e.g. the exceptions inbox). Each
+   item lifts + fades in, staggered via an inline --stagger-index, so the set
+   cascades in rather than snapping. Motion masks nothing — content is fully
+   readable the instant it lands. */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stagger-in {
+  opacity: 0;
+  animation: fade-in-up 360ms var(--ease-out-strong) forwards;
+  animation-delay: calc(var(--stagger-index, 0) * 45ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ring-spin, .ring-spin-reverse, .orbit, .orbit-node, .core-pulse, .metric-float { animation: none; }
+  /* Reduced motion: no movement, and never leave content stuck at opacity 0. */
+  .stagger-in { animation: none; opacity: 1; }
   html { scroll-behavior: auto; }
 }
+
+/* Hide scrollbars on deliberately-snap-scrollable rails (carousels) while
+   keeping them keyboard/wheel/touch scrollable -- the scroll affordance is
+   the visible arrow buttons, not a track. */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }

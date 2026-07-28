@@ -69,7 +69,7 @@ export function SignupPage() {
           </p>
         </div>
 
-        <Card className="shadow-(--shadow-card)">
+        <Card className="stagger-in shadow-(--shadow-card)">
           <CardContent className="p-7">
             <h1 className="text-[19px] font-semibold tracking-tight text-foreground">Create your account</h1>
             <p className="mt-1 text-[13px] text-muted-foreground">

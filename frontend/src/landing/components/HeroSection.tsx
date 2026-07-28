@@ -30,7 +30,7 @@ export function HeroSection() {
   const ctaLabel = user ? "Open dashboard" : "Get Started"
 
   return (
-    <section id="top" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white">
+    <section id="top" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background">
       <HeroBackground />
 
       <motion.div
@@ -75,7 +75,7 @@ export function HeroSection() {
         <motion.div variants={rise} className="mt-12">
           <Link
             to={ctaTo}
-            className="group inline-flex h-[54px] items-center gap-2 rounded-full bg-brand px-9 text-[16px] font-semibold text-brand-foreground shadow-lg shadow-brand/20 transition-all hover:bg-brand-hover hover:shadow-xl hover:shadow-brand/25"
+            className="group inline-flex h-[54px] items-center gap-2 rounded-full bg-brand px-9 text-[16px] font-semibold text-brand-foreground shadow-lg shadow-brand/20 transition-[transform,background-color,box-shadow] duration-150 ease-out-strong active:scale-[0.98] hover:bg-brand-hover hover:shadow-xl hover:shadow-brand/25"
           >
             {ctaLabel}
             <ArrowRight className="size-[18px] transition-transform group-hover:translate-x-0.5" />
@@ -93,7 +93,7 @@ export function HeroSection() {
         <motion.div
           animate={{ y: [0, 7, 0] }}
           transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="grid size-9 place-items-center rounded-full border border-border bg-white/70 text-muted-foreground backdrop-blur"
+          className="grid size-9 place-items-center rounded-full border border-border bg-card/70 text-muted-foreground backdrop-blur"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M6 9l6 6 6-6" />

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
+import { CountingNumber } from "@/components/app/counting-number"
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info"
 
@@ -16,6 +17,8 @@ const CHIP: Record<Tone, string> = {
 export function KpiCard({
   label,
   value,
+  numericValue,
+  format,
   unit,
   icon,
   chip,
@@ -25,6 +28,10 @@ export function KpiCard({
 }: {
   label: string
   value: string
+  /** When given (with `format`), the figure counts up to it instead of
+   *  rendering `value` statically. `value` stays the fallback/SSR text. */
+  numericValue?: number
+  format?: (n: number) => string
   unit?: string
   icon?: ReactNode
   chip?: ReactNode
@@ -35,7 +42,7 @@ export function KpiCard({
   children?: ReactNode
 }) {
   return (
-    <Card className="gap-0 p-5 shadow-(--shadow-card)">
+    <Card className="gap-0 p-5 shadow-(--shadow-card) transition-[transform,box-shadow] duration-200 ease-out-strong hover:shadow-[0_10px_30px_rgba(20,20,22,0.10)] [@media(hover:hover)]:hover:-translate-y-0.5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         {icon && (
@@ -52,7 +59,11 @@ export function KpiCard({
           tone === "success" && "text-success",
         )}
       >
-        {value}
+        {numericValue !== undefined && format ? (
+          <CountingNumber value={numericValue} format={format} />
+        ) : (
+          value
+        )}
         {unit && <span className="ml-1 text-[13px] font-normal tracking-normal text-muted-foreground">{unit}</span>}
       </div>
       {chip && (

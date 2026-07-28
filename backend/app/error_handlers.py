@@ -10,7 +10,18 @@ from app.exceptions import (
     NotFoundError,
     ProjectMismatch,
 )
-from app.services.month_close_service import AlreadyFinalized, FutureMonthFinalize, NotFinalized
+from app.services.exception_service import (
+    CorrectionNotVerified,
+    FollowUpDateInvalid,
+    FollowUpDateRequired,
+    ResolverNameRequired,
+)
+from app.services.month_close_service import (
+    AlreadyFinalized,
+    FutureMonthFinalize,
+    NotFinalized,
+    UnansweredExceptions,
+)
 
 
 def _envelope(code: str, message: str, details: list | None = None) -> dict:
@@ -71,6 +82,45 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=_envelope("future_month_finalize", str(exc)),
+        )
+
+    @app.exception_handler(UnansweredExceptions)
+    async def _unanswered_exceptions(request: Request, exc: UnansweredExceptions) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope(
+                "unanswered_exceptions", str(exc), [{"unanswered_count": exc.count}]
+            ),
+        )
+
+    @app.exception_handler(CorrectionNotVerified)
+    async def _correction_not_verified(request: Request, exc: CorrectionNotVerified) -> JSONResponse:
+        """The QS said "corrected" but re-running the rule shows the data still
+        violates it. Refusing is the whole point -- a claim isn't a fix."""
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("correction_not_verified", str(exc)),
+        )
+
+    @app.exception_handler(ResolverNameRequired)
+    async def _resolver_name_required(request: Request, exc: ResolverNameRequired) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("resolver_name_required", str(exc)),
+        )
+
+    @app.exception_handler(FollowUpDateRequired)
+    async def _follow_up_required(request: Request, exc: FollowUpDateRequired) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("follow_up_date_required", str(exc)),
+        )
+
+    @app.exception_handler(FollowUpDateInvalid)
+    async def _follow_up_invalid(request: Request, exc: FollowUpDateInvalid) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=_envelope("follow_up_date_invalid", str(exc)),
         )
 
     @app.exception_handler(IntegrityError)

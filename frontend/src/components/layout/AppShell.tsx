@@ -1,14 +1,15 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { motion } from "motion/react"
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
 import {
   ArrowLeftRight,
-  Building2,
   ClipboardCheck,
   FileText,
   Grid3x3,
   HeartPulse,
   LayoutDashboard,
   LayoutGrid,
+  Menu,
   PackageOpen,
   Receipt,
   Recycle,
@@ -17,10 +18,13 @@ import {
   TriangleAlert,
   Truck,
   Users,
+  Warehouse,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
 import { LogoMark } from "@/landing/components/Logo"
 import { Wordmark } from "@/landing/components/Wordmark"
 import { AccountMenu } from "@/landing/components/AccountMenu"
@@ -65,6 +69,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/bbs", label: "BBS Plan", icon: Ruler },
       { to: "/jmr", label: "JMR Actual", icon: ClipboardCheck },
       { to: "/physical-counts", label: "Physical Count", icon: Grid3x3 },
+      { to: "/myhome-stock", label: "Stock at My Home", icon: Warehouse },
       { to: "/scrap", label: "Scrap", icon: Recycle },
     ],
   },
@@ -101,6 +106,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/bbs": "BBS Plan",
   "/jmr": "JMR Actual",
   "/physical-counts": "Physical Count",
+  "/myhome-stock": "Stock at My Home",
   "/scrap": "Scrap Sales",
   "/abstract": "Monthly Steel Abstract",
   "/data-health": "Data Health",
@@ -115,6 +121,114 @@ function initials(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase()
+}
+
+/** The grouped nav links. Shared by the desktop rail and the mobile drawer.
+ * `variant="rail"` supports the hover-collapse icon rail; `variant="drawer"`
+ * is always full-width and labeled (mobile), and closes the sheet on tap. */
+function NavList({
+  navGroups,
+  variant,
+  collapsed = false,
+  onNavigate,
+}: {
+  navGroups: { label: string; items: NavItem[] }[]
+  variant: "rail" | "drawer"
+  collapsed?: boolean
+  onNavigate?: () => void
+}) {
+  const iconOnly = variant === "rail" && collapsed
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 pb-2" aria-label="Main">
+      {navGroups.map((group) => (
+        <div key={group.label}>
+          {!iconOnly && (
+            <div className="px-2 pb-1.5 pt-4 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              {group.label}
+            </div>
+          )}
+          {iconOnly && <div className="pt-4" />}
+          {group.items.map((item) =>
+            iconOnly ? (
+              <Tooltip key={item.to}>
+                <TooltipTrigger asChild>
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      cn(
+                        "relative mb-0.5 flex h-9 items-center justify-center rounded-lg text-muted-foreground transition-colors",
+                        "hover:bg-accent hover:text-foreground",
+                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        isActive && "bg-brand-subtle text-brand-text",
+                      )
+                    }
+                  >
+                    <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
+                  </NavLink>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    "relative flex items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-colors",
+                    // Larger tap target in the mobile drawer.
+                    variant === "drawer" ? "h-11" : "h-9",
+                    "hover:bg-accent hover:text-foreground",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    isActive && "bg-brand-subtle font-semibold text-brand-text",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {/* The active marker is one shared element per nav variant,
+                        so navigating SLIDES it to the new item instead of
+                        popping a new pseudo-element into place. layoutId ties
+                        the instances together across list items. */}
+                    {isActive && (
+                      <motion.span
+                        layoutId={`nav-active-${variant}`}
+                        aria-hidden
+                        className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r bg-brand"
+                        transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
+                      />
+                    )}
+                    <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            ),
+          )}
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+function UserCard({ user, collapsed = false }: { user: ReturnType<typeof useAuth>["user"]; collapsed?: boolean }) {
+  return (
+    <div className={cn("m-3 flex items-center gap-2.5 rounded-xl border p-2.5", collapsed && "mx-2 justify-center p-2")}>
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        {user ? initials(user.full_name || user.username) : "?"}
+      </span>
+      {!collapsed && (
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block truncate text-[13px] font-semibold">{user?.full_name}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {user?.role === "admin" ? "Admin" : "QS"}
+          </span>
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function AppShell() {
@@ -132,30 +246,31 @@ export function AppShell() {
 
   const [expanded, setExpanded] = useState(false)
   const collapsed = !expanded
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Close the mobile drawer on route change so a tap navigates AND dismisses.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   const navGroups = isAdmin ? ADMIN_NAV_GROUPS : NAV_GROUPS
 
   return (
     <TooltipProvider delayDuration={200}>
-      {/* The grid always reserves the slim 68px rail so the header/content
-          never shift; the sidebar itself floats over that gutter and beyond
-          it when expanded on hover. */}
-      <div className="grid h-screen grid-cols-[68px_1fr] grid-rows-[56px_1fr]">
-        {/* Sidebar */}
+      {/* Below md the rail is hidden entirely and the content spans full width;
+          nav lives in a hamburger-triggered drawer. From md up, the grid
+          reserves the slim 68px rail and the sidebar floats over it on hover. */}
+      <div className="grid h-screen grid-rows-[56px_1fr] md:grid-cols-[68px_1fr]">
+        {/* Desktop sidebar (md+) */}
         <aside
           onMouseEnter={() => setExpanded(true)}
           onMouseLeave={() => setExpanded(false)}
           className={cn(
-            "fixed inset-y-0 left-0 z-30 flex flex-col border-r bg-sidebar transition-[width] duration-200 ease-out",
+            "fixed inset-y-0 left-0 z-30 hidden flex-col border-r bg-sidebar transition-[width] duration-200 ease-out md:flex",
             expanded ? "w-[248px] shadow-[8px_0_30px_rgba(20,20,22,0.12)]" : "w-[68px]",
           )}
         >
-          <div
-            className={cn(
-              "flex items-center gap-2.5 px-4 py-3.5",
-              collapsed && "justify-center px-0",
-            )}
-          >
+          <div className={cn("flex items-center gap-2.5 px-4 py-3.5", collapsed && "justify-center px-0")}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link
@@ -163,95 +278,46 @@ export function AppShell() {
                   aria-label="Back to the Digi Reco site"
                   className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-75"
                 >
-                  {collapsed ? (
-                    <LogoMark className="size-7" />
-                  ) : (
-                    <Wordmark className="text-[19px] text-foreground" />
-                  )}
+                  {collapsed ? <LogoMark className="size-7" /> : <Wordmark className="text-[19px] text-foreground" />}
                 </Link>
               </TooltipTrigger>
               {collapsed && <TooltipContent side="right">Back to the Digi Reco site</TooltipContent>}
             </Tooltip>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 pb-2" aria-label="Main">
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                {!collapsed && (
-                  <div className="px-2 pb-1.5 pt-4 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
-                    {group.label}
-                  </div>
-                )}
-                {collapsed && <div className="pt-4" />}
-                {group.items.map((item) =>
-                  collapsed ? (
-                    <Tooltip key={item.to}>
-                      <TooltipTrigger asChild>
-                        <NavLink
-                          to={item.to}
-                          end={item.end}
-                          className={({ isActive }) =>
-                            cn(
-                              "relative mb-0.5 flex h-9 items-center justify-center rounded-lg text-muted-foreground transition-colors",
-                              "hover:bg-accent hover:text-foreground",
-                              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                              isActive && "bg-brand-subtle text-brand-text",
-                            )
-                          }
-                        >
-                          <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
-                        </NavLink>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{item.label}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        cn(
-                          "relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-colors",
-                          "hover:bg-accent hover:text-foreground",
-                          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                          isActive &&
-                            "bg-brand-subtle font-semibold text-brand-text before:absolute before:-left-3 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r before:bg-brand",
-                        )
-                      }
-                    >
-                      <item.icon className="size-[18px] shrink-0" strokeWidth={1.6} />
-                      {item.label}
-                    </NavLink>
-                  ),
-                )}
-              </div>
-            ))}
-          </nav>
-
-          <div className={cn("m-3 flex items-center gap-2.5 rounded-xl border p-2.5", collapsed && "mx-2 justify-center p-2")}>
-            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-              {user ? initials(user.full_name || user.username) : "?"}
-            </span>
-            {!collapsed && (
-              <span className="min-w-0 flex-1 leading-tight">
-                <span className="block truncate text-[13px] font-semibold">{user?.full_name}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {user?.role === "admin" ? "Admin" : "QS"}
-                </span>
-              </span>
-            )}
-          </div>
+          <NavList navGroups={navGroups} variant="rail" collapsed={collapsed} />
+          <UserCard user={user} collapsed={collapsed} />
         </aside>
 
-        {/* Header */}
-        <header className="col-start-2 flex items-center gap-3 border-b bg-card px-6">
+        {/* Header — spans full width on mobile, sits beside the rail on md+ */}
+        <header className="flex items-center gap-3 border-b bg-card px-4 md:col-start-2 md:px-6">
+          {/* Mobile hamburger + drawer */}
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="-ml-1 md:hidden" aria-label="Open navigation menu">
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="flex w-[264px] flex-col gap-0 p-0">
+              <SheetHeader className="border-b px-4 py-3.5 text-left">
+                <SheetTitle asChild>
+                  <Link to="/" aria-label="Back to the Digi Reco site" className="inline-flex">
+                    <Wordmark className="text-[19px] text-foreground" />
+                  </Link>
+                </SheetTitle>
+              </SheetHeader>
+              <NavList navGroups={navGroups} variant="drawer" onNavigate={() => setMobileOpen(false)} />
+              <UserCard user={user} />
+            </SheetContent>
+          </Sheet>
+
           <h1 className="font-display text-[17px] font-semibold tracking-tight">{title}</h1>
           <div className="flex-1" />
           <AccountMenu />
         </header>
 
         {/* Content */}
-        <main className="col-start-2 row-start-2 min-h-0 overflow-y-auto bg-background">
+        <main className="row-start-2 min-h-0 overflow-y-auto bg-background md:col-start-2">
           <Outlet />
         </main>
       </div>

@@ -16,7 +16,22 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        // Defaults to the normal dev backend. Override with VITE_API_TARGET to
+        // point the dev server at a throwaway instance (e.g. a sandbox DB on
+        // another port) without editing this file.
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  },
+  // `vite preview` needs its own proxy -- it does not inherit server.proxy. Without
+  // this the production build can't reach the API, so the only measurable numbers
+  // were dev-server ones, where hundreds of unbundled modules make load times
+  // meaningless. Same target and override.
+  preview: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
       },
     },

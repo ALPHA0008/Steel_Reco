@@ -17,6 +17,8 @@ import type {
   DiaGrade,
   Element,
   DataHealthResponse,
+  DraftAbstractRequest,
+  DraftAbstractResponse,
   ExceptionLog,
   ExceptionResolutionType,
   Floor,
@@ -29,6 +31,8 @@ import type {
   JmrActualCreate,
   PeriodBounds,
   WastageTrendResponse,
+  MyHomeStock,
+  MyHomeStockCreate,
   PhysicalCount,
   PhysicalCountCreate,
   Project,
@@ -186,6 +190,10 @@ const pcHooks = makeHooks<PhysicalCount, PhysicalCountCreate>("physical-counts",
 export const usePhysicalCounts = pcHooks.useList
 export const useCreatePhysicalCount = pcHooks.useCreate
 
+const myhomeStockHooks = makeHooks<MyHomeStock, MyHomeStockCreate>("myhome-stock", "/myhome-stock")
+export const useMyHomeStock = myhomeStockHooks.useList
+export const useCreateMyHomeStock = myhomeStockHooks.useCreate
+
 const scrapHooks = makeHooks<ScrapSale, ScrapSaleCreate>("scrap-sales", "/scrap-sales")
 export const useScrapSales = scrapHooks.useList
 export const useCreateScrapSale = scrapHooks.useCreate
@@ -216,11 +224,24 @@ export function useExceptions(status?: string) {
 export function useResolveException() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (p: { id: string; resolution_type: ExceptionResolutionType; reason: string }) =>
+    mutationFn: async (p: {
+      id: string
+      resolution_type: ExceptionResolutionType
+      reason: string
+      /** Required for follow_up; the backend refuses a past date or one beyond
+       *  the close horizon, so a rejection here is expected, not exceptional. */
+      follow_up_due_date?: string
+      /** Who is deciding. Required on every path — site logins are shared, so
+       *  the account cannot identify the person. The role is NOT sent: the
+       *  backend takes it from the session so it can't be overstated. */
+      resolver_name: string
+    }) =>
       (
         await api.post<ExceptionLog>(`/exceptions/${p.id}/resolve`, {
           resolution_type: p.resolution_type,
           reason: p.reason,
+          follow_up_due_date: p.follow_up_due_date ?? null,
+          resolver_name: p.resolver_name,
         })
       ).data,
     onSuccess: () => {
@@ -255,6 +276,15 @@ export function usePeriodBounds() {
     queryKey: ["abstract-period-bounds"],
     queryFn: async () => (await api.get<PeriodBounds>("/abstract/period-bounds")).data,
     staleTime: MASTERS_STALE,
+  })
+}
+
+/** Quick Draft: type A-N per diameter, get the same derived math + finding
+ * rules the real Abstract runs -- a stateless POST, nothing is ever saved. */
+export function useDraftAbstract() {
+  return useMutation({
+    mutationFn: async (payload: DraftAbstractRequest) =>
+      (await api.post<DraftAbstractResponse>("/abstract/draft", payload)).data,
   })
 }
 

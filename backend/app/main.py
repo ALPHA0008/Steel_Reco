@@ -19,6 +19,7 @@ from app.routers import (
     jmr_actual,
     masters,
     month_close,
+    myhome_stock,
     physical_count,
     projects,
     scrap_sale,
@@ -72,6 +73,7 @@ app.include_router(inter_site_transfer.router)
 app.include_router(bbs_plan.router)
 app.include_router(jmr_actual.router)
 app.include_router(physical_count.router)
+app.include_router(myhome_stock.router)
 app.include_router(scrap_sale.router)
 app.include_router(abstract.router)
 app.include_router(month_close.router)

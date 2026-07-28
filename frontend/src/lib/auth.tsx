@@ -4,9 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Navigate, useLocation } from "react-router-dom"
 import {
   clearToken,
@@ -31,6 +33,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient()
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState<boolean>(() => Boolean(getToken()))
 
@@ -53,24 +56,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = useCallback(async (username: string, password: string) => {
-    const token = await apiLogin(username, password)
-    setToken(token)
-    const me = await fetchMe()
-    setUser(me)
-  }, [])
+  // Backstop: clear the cache whenever the signed-in identity changes, however
+  // that happened. login()/logout() already clear at the two obvious points,
+  // but those are explicit calls that a future code path could bypass -- a
+  // token swapped in from elsewhere, a session restored as a different user.
+  // Because the cache keys are per-resource rather than per-user, missing one
+  // such path means showing one person another's project, so this watches the
+  // identity itself instead of trusting every caller to remember.
+  //
+  // Skipped when the cache is already empty, so the normal login flow (which
+  // cleared a moment earlier) doesn't clear twice and refetch needlessly.
+  const lastIdentity = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const id = user?.id ?? null
+    if (lastIdentity.current === id) return
+    const isFirstObservation = lastIdentity.current === undefined
+    lastIdentity.current = id
+    if (isFirstObservation) return
+    if (qc.getQueryCache().getAll().length > 0) qc.clear()
+  }, [user?.id, qc])
 
-  const signup = useCallback(async (payload: SignupPayload) => {
-    const token = await apiSignup(payload)
-    setToken(token)
-    const me = await fetchMe()
-    setUser(me)
-  }, [])
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const token = await apiLogin(username, password)
+      // Drop the previous account's cached responses BEFORE the new session
+      // starts fetching. Every cached entry is scoped to whoever was signed in
+      // -- keyed by resource, not by user -- so without this the incoming user
+      // is served the last one's dashboard, project name and ledger rows from
+      // cache while their own requests are still in flight.
+      qc.clear()
+      setToken(token)
+      const me = await fetchMe()
+      setUser(me)
+    },
+    [qc],
+  )
+
+  const signup = useCallback(
+    async (payload: SignupPayload) => {
+      const token = await apiSignup(payload)
+      qc.clear()
+      setToken(token)
+      const me = await fetchMe()
+      setUser(me)
+    },
+    [qc],
+  )
 
   const logout = useCallback(() => {
     clearToken()
     setUser(null)
-  }, [])
+    // Also cleared on the way out, so a signed-out browser holds no project
+    // data at all -- clearing only on login would leave the previous user's
+    // figures sitting in memory for anyone who reopens the tab.
+    qc.clear()
+  }, [qc])
 
   const value = useMemo(
     () => ({ user, loading, login, signup, logout }),

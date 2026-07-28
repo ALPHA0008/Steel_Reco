@@ -8,7 +8,7 @@ function Term({ label, value, unit, delay }: { label: string; value: number; uni
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ delay, duration: 0.5, ease: [0.2, 0, 0, 1] }}
-      className="rounded-2xl border border-border/80 bg-gradient-to-b from-white to-background px-6 py-5 text-center shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)]"
+      className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-background px-6 py-5 text-center shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)]"
     >
       <p className="font-mono text-[10.5px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
       <p className="tnum font-display mt-2 text-[28px] font-semibold tracking-tight text-foreground">
@@ -41,7 +41,7 @@ function Operator({ symbol, delay }: { symbol: string; delay: number }) {
  */
 export function AbstractProof() {
   return (
-    <div className="rounded-3xl border border-border/80 bg-gradient-to-b from-white to-background p-8 shadow-[0_40px_80px_rgba(20,20,22,0.12),0_4px_12px_rgba(20,20,22,0.06)] sm:p-10">
+    <div className="rounded-3xl border border-border/80 bg-gradient-to-b from-card to-background p-8 shadow-[0_40px_80px_rgba(20,20,22,0.12),0_4px_12px_rgba(20,20,22,0.06)] sm:p-10">
       <p className="text-center text-[11.5px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
         The number everyone argues over
       </p>
@@ -57,7 +57,7 @@ export function AbstractProof() {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ delay: 1.0, duration: 0.55, ease: [0.2, 0, 0, 1] }}
-          className="rounded-2xl border border-danger-border bg-gradient-to-b from-danger-subtle to-white px-7 py-5 text-center shadow-[0_4px_16px_rgba(166,37,34,0.08),0_1px_3px_rgba(166,37,34,0.04)]"
+          className="rounded-2xl border border-danger-border bg-gradient-to-b from-danger-subtle to-card px-7 py-5 text-center shadow-[0_4px_16px_rgba(166,37,34,0.08),0_1px_3px_rgba(166,37,34,0.04)]"
         >
           <p className="font-mono text-[10.5px] font-semibold tracking-wide text-danger uppercase">M · Wastage</p>
           <p className="font-display mt-2 text-[34px] font-semibold tracking-tight text-danger">

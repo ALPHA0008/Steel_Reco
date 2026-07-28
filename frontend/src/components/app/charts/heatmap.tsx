@@ -89,7 +89,7 @@ export function RiskHeatmap({
                   return (
                     <div
                       key={mk}
-                      className="h-5 flex-1 rounded-[3px] transition-transform hover:scale-110"
+                      className="h-5 flex-1 rounded-[3px] transition-transform duration-150 ease-out-strong [@media(hover:hover)]:hover:scale-110"
                       style={{ background: cellColor(pct, s.cap_pct) }}
                       onMouseEnter={() => setHover({ site: s.name, label: `${monthShort(y, m)} ${String(y).slice(2)}`, pct })}
                       onMouseLeave={() => setHover(null)}

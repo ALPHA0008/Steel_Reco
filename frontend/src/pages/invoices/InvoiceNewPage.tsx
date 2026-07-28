@@ -116,7 +116,7 @@ export function InvoiceNewPage() {
           <form onSubmit={onSubmit} className="space-y-6" noValidate>
             {banner && <Banner variant="blocking">{banner}</Banner>}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="Invoice number"
                 required
@@ -135,7 +135,7 @@ export function InvoiceNewPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="Vendor"
                 required
@@ -175,7 +175,7 @@ export function InvoiceNewPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="E-way bill no."
                 error={fieldErrors.eway_bill_number}

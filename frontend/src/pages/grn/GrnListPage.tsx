@@ -1,8 +1,12 @@
+import { formatDate } from "@/lib/format"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { PackageOpen, Plus } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
 import { DataTable, type Column } from "@/components/app/data-table"
+import { DataTableToolbar, DataTablePagination } from "@/components/app/data-table-toolbar"
+import { SummaryStrip } from "@/components/app/summary-strip"
+import { useTableControls } from "@/components/app/table-controls"
 import { EmptyState } from "@/components/app/empty-state"
 import { Banner } from "@/components/app/banner"
 import { Button } from "@/components/ui/button"
@@ -25,8 +29,8 @@ const poSummaryColumns: Column<GrnPoSummaryRow>[] = [
   { key: "po_reference", header: "PO reference", render: (r) => <span className="tnum">{r.po_reference}</span> },
   { key: "count", header: "Receipts", numeric: true, render: (r) => r.grn_count },
   { key: "total", header: "Total (kg)", numeric: true, render: (r) => formatKg(r.total_kg) },
-  { key: "first", header: "First receipt", render: (r) => <span className="tnum text-muted-foreground">{r.first_date}</span> },
-  { key: "last", header: "Last receipt", render: (r) => <span className="tnum text-muted-foreground">{r.last_date}</span> },
+  { key: "first", header: "First receipt", render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.first_date)}</span> },
+  { key: "last", header: "Last receipt", render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.last_date)}</span> },
   {
     key: "linked",
     header: "Linked to real PO",
@@ -54,15 +58,43 @@ export function GrnListPage() {
   const diaById = useMemo(() => new Map((dias.data ?? []).map((d) => [d.id, d])), [dias.data])
   const poById = useMemo(() => new Map((purchaseOrders.data ?? []).map((p) => [p.id, p])), [purchaseOrders.data])
 
+  const allGrns = useMemo(() => grns.data ?? [], [grns.data])
+  const vendorName = (r: Grn) => vendorById.get(r.vendor_id)?.name ?? ""
+  const diaName = (r: Grn) => diaLabel(diaById.get(r.dia_grade_id))
+
+  const controls = useTableControls(allGrns, {
+    searchText: (r) => `${vendorName(r)} ${diaName(r)} ${r.po_reference ?? ""} ${RECEIPT_LABELS[r.receipt_type]}`,
+    facets: [
+      { key: "vendor", label: "Vendor", accessor: vendorName },
+      { key: "dia", label: "Dia", accessor: diaName },
+      { key: "receipt", label: "Receipt type", accessor: (r) => RECEIPT_LABELS[r.receipt_type] },
+    ],
+    sorts: {
+      date: (r) => r.effective_date,
+      vendor: (r) => vendorName(r),
+      net: (r) => parseFloat(r.weighbridge_weight_kg) || 0,
+    },
+    defaultSort: { key: "date", dir: "desc" },
+  })
+
+  const summary = useMemo(() => {
+    const rows = allGrns
+    const totalKg = rows.reduce((a, r) => a + (parseFloat(r.weighbridge_weight_kg) || 0), 0)
+    const flagged = rows.filter((r) => r.warning).length
+    const distinctVendors = new Set(rows.map((r) => r.vendor_id)).size
+    return { count: rows.length, totalKg, flagged, distinctVendors }
+  }, [allGrns])
+
   const columns: Column<Grn>[] = [
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="tnum text-muted-foreground">{r.effective_date}</span>,
+      sortKey: true,
+      render: (r) => <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(r.effective_date)}</span>,
     },
-    { key: "vendor", header: "Vendor", render: (r) => vendorById.get(r.vendor_id)?.name ?? "—" },
+    { key: "vendor", header: "Vendor", sortKey: true, render: (r) => vendorById.get(r.vendor_id)?.name ?? "—" },
     { key: "dia", header: "Dia", render: (r) => diaLabel(diaById.get(r.dia_grade_id)) },
-    { key: "net", header: "Net (kg)", numeric: true, render: (r) => formatKg(r.weighbridge_weight_kg) },
+    { key: "net", header: "Net (kg)", numeric: true, sortKey: true, render: (r) => formatKg(r.weighbridge_weight_kg) },
     {
       key: "type",
       header: "Receipt",
@@ -135,28 +167,80 @@ export function GrnListPage() {
       )}
 
       {view === "receipts" ? (
-        <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
-          <DataTable
-            columns={columns}
-            rows={grns.data ?? []}
-            rowKey={(r) => r.id}
-            loading={grns.isLoading}
-            empty={
-              <EmptyState
-                icon={<PackageOpen />}
-                title="No GRNs recorded yet"
-                description="Record the first receipt to begin the ledger."
-                action={
-                  <Button asChild className="bg-brand text-brand-foreground hover:bg-brand-hover">
-                    <Link to="/grn/new">
-                      <Plus /> Record GRN
-                    </Link>
-                  </Button>
-                }
-              />
-            }
-          />
-        </Card>
+        <div className="space-y-4">
+          {!grns.isLoading && summary.count > 0 && (
+            <SummaryStrip
+              stats={[
+                {
+                  label: "Receipts",
+                  value: summary.count.toLocaleString("en-IN"),
+                  numericValue: summary.count,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
+                },
+                {
+                  label: "Total received",
+                  value: `${formatKg(summary.totalKg)} kg`,
+                  numericValue: summary.totalKg,
+                  format: (n) => `${formatKg(n)} kg`,
+                },
+                {
+                  label: "Vendors",
+                  value: summary.distinctVendors.toLocaleString("en-IN"),
+                  numericValue: summary.distinctVendors,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
+                },
+                {
+                  label: "Flagged",
+                  value: summary.flagged.toLocaleString("en-IN"),
+                  numericValue: summary.flagged,
+                  format: (n) => Math.round(n).toLocaleString("en-IN"),
+                  tone: summary.flagged > 0 ? "warning" : "muted",
+                  hint: summary.flagged > 0 ? "reconciliation advisory" : "all clean",
+                },
+              ]}
+            />
+          )}
+          {!grns.isLoading && summary.count > 0 && (
+            <DataTableToolbar controls={controls} searchPlaceholder="Search vendor, dia, PO…" />
+          )}
+          <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
+            <DataTable
+              columns={columns}
+              rows={controls.rows}
+              rowKey={(r) => r.id}
+              loading={grns.isLoading}
+              sorting={controls}
+              empty={
+                controls.hasActiveFilters ? (
+                  <EmptyState
+                    icon={<PackageOpen />}
+                    title="No receipts match your filters"
+                    description="Try clearing a filter or search term."
+                    action={
+                      <Button variant="outline" onClick={controls.resetAll}>
+                        Reset filters
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <EmptyState
+                    icon={<PackageOpen />}
+                    title="No GRNs recorded yet"
+                    description="Record the first receipt to begin the ledger."
+                    action={
+                      <Button asChild className="bg-brand text-brand-foreground hover:bg-brand-hover">
+                        <Link to="/grn/new">
+                          <Plus /> Record GRN
+                        </Link>
+                      </Button>
+                    }
+                  />
+                )
+              }
+            />
+            {!grns.isLoading && summary.count > 0 && <DataTablePagination controls={controls} />}
+          </Card>
+        </div>
       ) : (
         <Card className="overflow-hidden py-0 shadow-(--shadow-card)">
           <DataTable

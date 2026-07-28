@@ -69,7 +69,7 @@ class InboundReconciliationRule(BaseRule):
 
         # 4. no anchor at all -- unreconciled, not necessarily wrong
         if po_id is None and invoiced_qty is None:
-            reasons.append("no Purchase Order or Supplier Invoice linked -- unreconciled")
+            reasons.append("no Purchase Order or Supplier Invoice linked — unreconciled")
 
         passed = len(reasons) == 0
         return RuleResult(

@@ -20,11 +20,11 @@ const tile: Variants = {
 }
 
 const tileBase =
-  "group relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-white to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-border hover:shadow-[0_24px_56px_rgba(20,20,22,0.12)]"
+  "group relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-card to-background p-7 shadow-[0_4px_16px_rgba(20,20,22,0.06),0_1px_3px_rgba(20,20,22,0.04)] transition-[transform,border-color,box-shadow] duration-300 ease-out-strong [@media(hover:hover)]:hover:-translate-y-1.5 hover:border-brand-border hover:shadow-[0_24px_56px_rgba(20,20,22,0.12)]"
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="relative bg-white py-24 md:py-32">
+    <section id="features" className="relative bg-card py-24 md:py-32">
       <div className="mx-auto max-w-[1200px] px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -80,7 +80,7 @@ export function FeaturesSection() {
 
           {/* Tile 2 — genuine sum */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-2")}>
-            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
+            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-[transform,background-color,color] duration-300 ease-out-strong group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
               <Scale className="size-5" strokeWidth={1.8} />
             </span>
             <h3 className="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-foreground">Issued is a real sum</h3>
@@ -91,7 +91,7 @@ export function FeaturesSection() {
 
           {/* Tile 3 — upstream reconciliation */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-2")}>
-            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
+            <span className="grid size-11 place-items-center rounded-xl bg-background text-info transition-[transform,background-color,color] duration-300 ease-out-strong group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
               <FileCheck2 className="size-5" strokeWidth={1.8} />
             </span>
             <h3 className="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-foreground">Upstream checks</h3>
@@ -132,7 +132,7 @@ export function FeaturesSection() {
           {/* Tile 5 — cut pieces */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-3")}>
             <div className="flex items-start gap-4">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-[transform,background-color,color] duration-300 ease-out-strong group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
                 <Scissors className="size-5" strokeWidth={1.8} />
               </span>
               <div>
@@ -147,7 +147,7 @@ export function FeaturesSection() {
           {/* Tile 6 — months lock */}
           <motion.div variants={tile} className={cn(tileBase, "md:col-span-3")}>
             <div className="flex items-start gap-4">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-all duration-300 group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-background text-info transition-[transform,background-color,color] duration-300 ease-out-strong group-hover:scale-110 group-hover:-rotate-3 group-hover:bg-brand-subtle group-hover:text-brand">
                 <Lock className="size-5" strokeWidth={1.8} />
               </span>
               <div>

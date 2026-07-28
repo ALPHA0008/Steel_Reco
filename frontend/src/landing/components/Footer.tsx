@@ -101,7 +101,7 @@ export function Footer() {
                   rel="noreferrer"
                   aria-label={label}
                   style={style}
-                  className={`grid size-9 place-items-center rounded-full shadow-sm transition-transform hover:scale-105 ${className}`}
+                  className={`grid size-9 place-items-center rounded-full shadow-sm transition-transform duration-150 ease-out-strong [@media(hover:hover)]:hover:scale-105 ${className}`}
                 >
                   <Icon className="size-4" />
                 </a>
@@ -111,7 +111,7 @@ export function Footer() {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="My Home Constructions"
-                className="grid size-9 place-items-center rounded-full bg-white p-1.5 shadow-sm transition-transform hover:scale-105"
+                className="grid size-9 place-items-center rounded-full bg-white p-1.5 shadow-sm transition-transform duration-150 ease-out-strong [@media(hover:hover)]:hover:scale-105"
               >
                 <LogoMark className="size-full" />
               </a>

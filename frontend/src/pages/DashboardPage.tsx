@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { lazy, Suspense, useMemo } from "react"
 import { Link } from "react-router-dom"
 import {
   ArrowLeftRight,
@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { Page, PageHeader } from "@/components/app/page"
+import { formatDate } from "@/lib/format"
 import { KpiCard } from "@/components/app/kpi"
 import { EmptyState } from "@/components/app/empty-state"
 import { Banner } from "@/components/app/banner"
@@ -17,7 +18,13 @@ import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
 import { apiErrorMessage } from "@/lib/api"
-import { WastageTrendArea } from "@/components/app/wastage-trend-area"
+// Recharts is ~343KB -- a third of the whole app. Imported statically it had to
+// download and parse before the dashboard could paint at all, which is why the
+// KPIs appeared to wait on the chart. Loading it on demand lets the numbers
+// render immediately and the curve arrive a moment later behind its skeleton.
+const WastageTrendArea = lazy(() =>
+  import("@/components/app/wastage-trend-area").then((m) => ({ default: m.WastageTrendArea })),
+)
 import {
   useDashboardSummary,
   useDiaGrades,
@@ -30,11 +37,19 @@ import {
   formatKg,
 } from "@/lib/queries"
 
+/** kg string -> MT number, for the count-up animation to drive. */
+function mtValue(kg: string): number {
+  return (parseFloat(kg) || 0) / 1000
+}
+
+/** The one formatter every MT figure on this page renders through -- shared by
+ * the static fallback and each animated frame so they never differ. */
+function mtFormat(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function mt(kg: string): string {
-  return (parseFloat(kg) / 1000).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  return mtFormat(mtValue(kg))
 }
 
 /** Landing view: this month at a glance, then straight into the work. */
@@ -75,7 +90,7 @@ export function DashboardPage() {
         </Banner>
       )}
 
-      <div className="mb-5 grid grid-cols-4 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {summary.isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
         ) : summary.data ? (
@@ -83,6 +98,8 @@ export function DashboardPage() {
             <KpiCard
               label="Net Received"
               value={mt(summary.data.total_received_kg)}
+              numericValue={mtValue(summary.data.total_received_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<PackageOpen />}
               chip="Cumulative"
@@ -90,6 +107,8 @@ export function DashboardPage() {
             <KpiCard
               label="Issued to Contractors"
               value={mt(summary.data.total_issued_kg)}
+              numericValue={mtValue(summary.data.total_issued_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<ArrowLeftRight />}
               chip="Genuine sum of issues"
@@ -98,6 +117,8 @@ export function DashboardPage() {
             <KpiCard
               label="Scrap Sold"
               value={mt(summary.data.total_scrap_sold_kg)}
+              numericValue={mtValue(summary.data.total_scrap_sold_kg)}
+              format={mtFormat}
               unit="MT"
               icon={<Recycle />}
               chip="Section N"
@@ -105,6 +126,8 @@ export function DashboardPage() {
             <KpiCard
               label="Wastage"
               value={wastage == null ? "—" : `${wastage.toFixed(2)}%`}
+              numericValue={wastage ?? undefined}
+              format={(n) => `${n.toFixed(2)}%`}
               tone={overCap ? "danger" : wastage != null ? "success" : undefined}
               icon={<TriangleAlert />}
               chip={
@@ -120,7 +143,7 @@ export function DashboardPage() {
         ) : null}
       </div>
 
-      <div className="mb-5 grid grid-cols-[1.4fr_1fr] gap-4">
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="py-0 shadow-(--shadow-card)">
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="text-[15px] font-semibold tracking-tight">Recent GRNs</h2>
@@ -136,7 +159,7 @@ export function DashboardPage() {
             <ul className="divide-y">
               {recentGrns.map((g) => (
                 <li key={g.id} className="flex items-center gap-3 px-5 py-2.5 text-[13px]">
-                  <span className="tnum text-muted-foreground">{g.effective_date}</span>
+                  <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(g.effective_date)}</span>
                   <span className="font-medium">{vendorById.get(g.vendor_id)?.name ?? "—"}</span>
                   <span className="text-muted-foreground">{diaLabel(diaById.get(g.dia_grade_id))}</span>
                   <span className="tnum ml-auto font-semibold">{formatKg(g.weighbridge_weight_kg)} kg</span>
@@ -161,7 +184,7 @@ export function DashboardPage() {
             <ul className="divide-y">
               {recentIssues.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-5 py-2.5 text-[13px]">
-                  <span className="tnum text-muted-foreground">{i.effective_date}</span>
+                  <span className="tnum whitespace-nowrap text-muted-foreground">{formatDate(i.effective_date)}</span>
                   <span className="text-muted-foreground">{diaLabel(diaById.get(i.dia_grade_id))}</span>
                   <span className="tnum ml-auto font-semibold">
                     {i.direction === "in" ? "−" : ""}
@@ -182,10 +205,14 @@ export function DashboardPage() {
           <Skeleton className="m-5 h-[220px] rounded-lg" />
         ) : wastageTrend.data && wastageTrend.data.points.length > 0 ? (
           <div className="p-5">
-            <WastageTrendArea
-              points={wastageTrend.data.points}
-              capPct={parseFloat(wastageTrend.data.contract_wastage_cap_pct)}
-            />
+            {/* Same skeleton as the data-loading state, so a slow chunk on a
+                cold cache looks like loading rather than a layout jump. */}
+            <Suspense fallback={<Skeleton className="h-[220px] rounded-lg" />}>
+              <WastageTrendArea
+                points={wastageTrend.data.points}
+                capPct={parseFloat(wastageTrend.data.contract_wastage_cap_pct)}
+              />
+            </Suspense>
           </div>
         ) : (
           <EmptyState

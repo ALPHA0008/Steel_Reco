@@ -1,9 +1,11 @@
+import asyncio
 import uuid
 from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import async_session_factory, set_rls_context
 from app.repositories.abstract_repository import AbstractRepository
 from app.schemas.abstract import AbstractResponse, PeriodBoundsResponse, WastageTrendPoint, WastageTrendResponse
 
@@ -51,28 +53,76 @@ class AbstractService:
             latest_month=latest.month if latest else None,
         )
 
-    async def get_wastage_trend(self, project_id: uuid.UUID) -> WastageTrendResponse:
+    async def get_wastage_trend(
+        self,
+        project_id: uuid.UUID,
+        *,
+        rls_user_id: str | None = None,
+        rls_user_role: str | None = None,
+    ) -> WastageTrendResponse:
         """Section M (cumulative wastage %) as of every month-end from the
         project's earliest to latest real activity -- each point is a full
         re-run of compute(), same as the on-screen Abstract for that period,
-        never a separately-tracked series."""
+        never a separately-tracked series.
+
+        Each month is independent, so passing `rls_user_role` runs them
+        CONCURRENTLY on their own pooled sessions instead of one after another.
+        A 16-month trend issues ~128 cumulative queries; awaiting them serially
+        was the slowest call in the app (~4.6s and no better on a second load).
+        The numbers are identical either way -- this only changes how many are
+        in flight at once.
+
+        The identity is threaded through and re-applied to every child session
+        so each one is scoped exactly as the caller is. It deliberately does NOT
+        borrow the admin role to go faster: that would let a QS read a trend for
+        a project they cannot otherwise see.
+
+        Without an identity (internal callers, tests) it falls back to the
+        serial path on the existing session, whose RLS context is already set.
+        """
         bounds = await self._repo.activity_bounds(project_id)
         earliest, latest = bounds["earliest"], bounds["latest"]
         cap = await self._repo.contract_wastage_cap_pct(project_id)
-        points: list[WastageTrendPoint] = []
-        if earliest is not None and latest is not None:
-            year, month = earliest.year, earliest.month
-            while (year, month) <= (latest.year, latest.month):
+        if earliest is None or latest is None:
+            return WastageTrendResponse(contract_wastage_cap_pct=cap or Decimal("3.00"), points=[])
+
+        months: list[tuple[int, int]] = []
+        year, month = earliest.year, earliest.month
+        while (year, month) <= (latest.year, latest.month):
+            months.append((year, month))
+            year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+        if rls_user_role is None:
+            # Serial fallback -- one session, one month at a time.
+            points = []
+            for y, m in months:
                 # Trend needs only section_m; skip the findings queries.
-                abstract = await self.compute(project_id, year, month, with_findings=False)
+                ab = await self.compute(project_id, y, m, with_findings=False)
                 points.append(
                     WastageTrendPoint(
-                        year=year, month=month, period_label=abstract.period_label,
-                        wastage_pct=abstract.section_m_wastage_pct,
+                        year=y, month=m, period_label=ab.period_label,
+                        wastage_pct=ab.section_m_wastage_pct,
                     )
                 )
-                year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-        return WastageTrendResponse(contract_wastage_cap_pct=cap or Decimal("3.00"), points=points)
+            return WastageTrendResponse(contract_wastage_cap_pct=cap or Decimal("3.00"), points=points)
+
+        # Bounded concurrency: enough to hide latency, not enough to exhaust the
+        # connection pool when several users load their dashboard at once.
+        sem = asyncio.Semaphore(8)
+
+        async def one(y: int, m: int) -> WastageTrendPoint:
+            async with sem, async_session_factory() as child:
+                await set_rls_context(child, user_id=rls_user_id, user_role=rls_user_role)
+                ab = await AbstractService(child).compute(project_id, y, m, with_findings=False)
+                return WastageTrendPoint(
+                    year=y, month=m, period_label=ab.period_label,
+                    wastage_pct=ab.section_m_wastage_pct,
+                )
+
+        computed = await asyncio.gather(*(one(y, m) for (y, m) in months))
+        return WastageTrendResponse(
+            contract_wastage_cap_pct=cap or Decimal("3.00"), points=list(computed)
+        )
 
     async def compute(
         self, project_id: uuid.UUID, year: int, month: int, with_findings: bool = True
@@ -89,6 +139,7 @@ class AbstractService:
         section_e = await self._repo.section_e_consumption(project_id, month_end)
         section_f = await self._repo.section_f_wip(project_id, month_end)
         sections_ij = await self._repo.sections_ij_physical_stock(project_id, month_end)
+        myhome_by_dia = await self._repo.myhome_stock_by_dia(project_id, month_end)
         scrap_kg = await self._repo.section_n_scrap_sold(project_id, month_end)
 
         a_by_dia = _sum_by_dia(section_a, "total_received_kg")
@@ -110,7 +161,15 @@ class AbstractService:
             for dia in set(c_by_dia) | set(g_by_dia)
         }
 
+        # K = I + J + MyHome-yard stock (migration 0010). myhome_by_dia is {}
+        # for every project that has never recorded MyHome stock, so K is
+        # numerically unchanged (still I + J) for all existing data --
+        # this only adds a third bucket when a QS actually uses it.
         k_by_dia = _sum_by_dia(sections_ij, "total_physical_kg")
+        k_by_dia = {
+            dia: k_by_dia.get(dia, Decimal("0")) + myhome_by_dia.get(dia, Decimal("0"))
+            for dia in set(k_by_dia) | set(myhome_by_dia)
+        }
 
         l_by_dia = {
             dia: h_by_dia.get(dia, Decimal("0")) - k_by_dia.get(dia, Decimal("0"))
@@ -159,6 +218,7 @@ class AbstractService:
             section_g_consumption_plus_wip=g_by_dia,
             section_h_theoretical_stock=h_by_dia,
             sections_ij_physical_stock=sections_ij,
+            section_myhome_stock=myhome_by_dia,
             section_k_total_physical=k_by_dia,
             section_l_wastage_qty=l_by_dia,
             section_m_wastage_pct=m_wastage_pct,

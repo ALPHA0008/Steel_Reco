@@ -99,7 +99,7 @@ export function ScrapNewPage() {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="Weight (kg)"
                 required
@@ -142,7 +142,7 @@ export function ScrapNewPage() {
               render={(p) => <Input {...p} readOnly value={total} className="tnum bg-muted" />}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="Gate pass no."
                 error={fieldErrors.gate_pass_no}
