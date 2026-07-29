@@ -454,7 +454,23 @@ export function AbstractPage() {
                     const label = row.breakout ? (
                       <span className="flex items-center gap-2 pl-5">
                         <span aria-hidden className="text-muted-foreground/40">└</span>
-                        <span className="text-[12.5px] font-medium text-muted-foreground">{row.label}</span>
+                        {/* "Stock at My Home" is the only row here that is
+                            entered rather than derived, and it no longer has a
+                            nav entry of its own -- one figure per diameter,
+                            recorded rarely, did not warrant a permanent seat in
+                            the ledger nav. So the row where it is READ is also
+                            the way in to record it, which is where someone
+                            notices it is missing anyway. */}
+                        {row.code === "C1" ? (
+                          <Link
+                            to="/myhome-stock"
+                            className="text-[12.5px] font-medium text-muted-foreground underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground"
+                          >
+                            {row.label}
+                          </Link>
+                        ) : (
+                          <span className="text-[12.5px] font-medium text-muted-foreground">{row.label}</span>
+                        )}
                       </span>
                     ) : (
                       <span className="flex items-baseline gap-2">

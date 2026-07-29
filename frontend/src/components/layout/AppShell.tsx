@@ -18,7 +18,6 @@ import {
   TriangleAlert,
   Truck,
   Users,
-  Warehouse,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
@@ -69,7 +68,12 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/bbs", label: "BBS Plan", icon: Ruler },
       { to: "/jmr", label: "JMR Actual", icon: ClipboardCheck },
       { to: "/physical-counts", label: "Physical Count", icon: Grid3x3 },
-      { to: "/myhome-stock", label: "Stock at My Home", icon: Warehouse },
+      // No "Stock at My Home" entry here on purpose. It is one figure per
+      // diameter, entered rarely, and it exists to feed a single Abstract row
+      // (K = I + J + Stock at My Home) -- so it earns a line in the Abstract,
+      // not a permanent seat in the ledger nav beside GRN and Store Issues.
+      // The Abstract's own "Stock at My Home" row links through to the record
+      // screen; the routes are still live.
       { to: "/scrap", label: "Scrap", icon: Recycle },
     ],
   },
