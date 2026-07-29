@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { Building2, Pause, Play } from "lucide-react"
+import { Building2 } from "lucide-react"
 import { Cell, Pie, PieChart } from "recharts"
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
 import { siteImage } from "@/lib/site-images"
@@ -117,14 +117,19 @@ export function ContributionDonut({
   }, [rows, allSites])
 
   const [index, setIndex] = useState(0)
-  // Autoplay stops for good once the reader takes over -- a carousel that keeps
-  // yanking the view away after you have chosen a site is hostile.
-  const [surrendered, setSurrendered] = useState(false)
   const [hovering, setHovering] = useState(false)
 
-  // Reduced motion means no unprompted movement at all: the spotlight holds the
-  // leading site and waits to be driven.
-  const playing = !reduceMotion && !surrendered && !hovering && slices.length > 1
+  // Cycling pauses while the pointer is over the panel and resumes when it
+  // leaves. It used to latch off permanently the moment you touched anything,
+  // on the reasoning that re-stealing the view after a deliberate choice is
+  // hostile -- but that made a brush of the mouse kill the animation for good,
+  // with no way back short of a reload. Pausing on hover already covers the
+  // "leave it where I put it" case, for exactly as long as the reader is there.
+  //
+  // An active dashboard filter still stops it outright: that IS a deliberate
+  // choice, and drifting off the filtered site would contradict the rest of the
+  // page. Reduced motion means no unprompted movement at all.
+  const playing = !reduceMotion && !hovering && !activeId && slices.length > 1
 
   // Keep the index in range when the tab switches and the row count changes.
   useEffect(() => {
@@ -136,10 +141,7 @@ export function ContributionDonut({
   useEffect(() => {
     if (!activeId) return
     const i = slices.findIndex((s) => s.id === activeId)
-    if (i >= 0) {
-      setIndex(i)
-      setSurrendered(true)
-    }
+    if (i >= 0) setIndex(i)
   }, [activeId, slices])
 
   useEffect(() => {
@@ -148,13 +150,7 @@ export function ContributionDonut({
     return () => window.clearInterval(t)
   }, [playing, slices.length])
 
-  const focus = useCallback(
-    (i: number, { takeOver = true }: { takeOver?: boolean } = {}) => {
-      setIndex(i)
-      if (takeOver) setSurrendered(true)
-    },
-    [],
-  )
+  const focus = useCallback((i: number) => setIndex(i), [])
 
   const active = slices[Math.min(index, slices.length - 1)]
   const railRef = useRef<HTMLDivElement>(null)
@@ -394,29 +390,6 @@ export function ContributionDonut({
             </motion.div>
           </AnimatePresence>
 
-          {/* Autoplay state, shown only while it is actually cycling. Reads as
-              information, not a control -- the whole card is the control. */}
-          {slices.length > 1 && (
-            <span className="absolute top-3 right-3 grid size-6 place-items-center rounded-full bg-black/35 text-white/80 backdrop-blur-sm">
-              {playing ? (
-                <Play className="size-3 translate-x-px" strokeWidth={2.5} />
-              ) : (
-                <Pause className="size-3" strokeWidth={2.5} />
-              )}
-            </span>
-          )}
-
-          {/* Dwell progress: restarted per site by the key, and only present
-              while cycling so a paused card has no crawling bar. */}
-          {playing && (
-            <motion.div
-              key={`${active.id}-progress`}
-              className="absolute inset-x-0 top-0 h-[2px] origin-left bg-white/70"
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: DWELL_MS / 1000, ease: "linear" }}
-            />
-          )}
         </button>
 
         {/* ---- Chip rail: legend and navigation in one ---- */}
