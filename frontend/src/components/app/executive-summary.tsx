@@ -1,25 +1,14 @@
-import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from "lucide-react"
+import { ArrowRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { HealthGauge } from "@/components/app/health-gauge"
 import type { AnalyticsNarrative } from "@/lib/types"
 
-function gradeColor(g: string): string {
-  return g === "A" ? "var(--success)" : g === "B" ? "var(--info)" : g === "C" ? "var(--warning)" : "var(--danger)"
-}
-
-function crore(inr: number): string {
-  const cr = inr / 1_00_00_000
-  if (cr >= 1) return `₹${cr.toFixed(2)} Cr`
-  const lakh = inr / 1_00_000
-  return `₹${lakh.toFixed(1)} L`
-}
-
 /**
  * Executive narrative hero — a compact analyst-style brief built to sit at
- * HALF page width (beside the site map): gauge + grade on top, the synthesized
- * headline, then a tight metric row, then the recommended next step. Answers
- * "is it healthy / why / what next / what's the impact" without needing full
- * page width.
+ * HALF page width (beside the site map): health gauge and the synthesized
+ * headline on top, a tight metric row, the wastage-vs-cap meter, then the
+ * recommended next step. Answers "is it healthy / why / what next" without
+ * needing full page width.
  */
 export function ExecutiveSummary({
   n,
@@ -28,9 +17,6 @@ export function ExecutiveSummary({
   n: AnalyticsNarrative
   onOpenDriver?: (projectId: string) => void
 }) {
-  const up = n.health_wow_delta_pp > 0.02 // wastage up = health down
-  const gc = gradeColor(n.grade)
-
   return (
     <section className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-border/60 bg-card p-6">
       {/* subtle industrial blueprint grid + accent wash */}
@@ -45,25 +31,20 @@ export function ExecutiveSummary({
       />
 
       <div className="relative flex flex-1 flex-col justify-between gap-5">
-        {/* Top: gauge + grade + headline */}
+        {/* Top: gauge + headline */}
         <div className="flex items-center gap-5">
           <HealthGauge score={n.health} size={116} label="" showBand={false} />
           <div className="min-w-0 flex-1">
+            {/* Eyebrow only. The letter grade and the week-on-week delta used to
+                sit here, and both were saying what the gauge beside them already
+                says -- a score out of 100 does not also need a D stamped next to
+                it, and a 0.21pp move is inside the noise of a figure quoted to
+                two decimals. The headline underneath is the actual verdict. */}
             <div className="mb-2 flex items-center gap-2">
               <span className="grid size-5 place-items-center rounded-md bg-brand-subtle text-brand-text">
                 <Sparkles className="size-3" />
               </span>
               <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Executive summary</span>
-              <span
-                className="font-display ml-auto grid size-7 shrink-0 place-items-center rounded-lg text-[14px] font-bold text-white"
-                style={{ background: gc }}
-              >
-                {n.grade}
-              </span>
-              <span className={cn("flex shrink-0 items-center gap-1 text-[11px] font-semibold", up ? "text-danger" : "text-success")}>
-                {up ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                {Math.abs(n.health_wow_delta_pp).toFixed(2)}pp
-              </span>
             </div>
             <p className="text-[16px] font-semibold leading-snug tracking-tight text-foreground text-balance">
               {n.headline}
@@ -85,12 +66,24 @@ export function ExecutiveSummary({
               {n.forecast_pct == null ? "—" : `${n.forecast_pct.toFixed(2)}%`}
             </div>
           </div>
+          {/* "Sites over cap" rather than the rupee figure that was here.
+              Savings/1pp was steel price x tonnage-per-point -- an estimate
+              resting on a price assumption, quoted in crore beside two measured
+              percentages, which lent it more authority than it had earned. This
+              is counted, not modelled, and it says how widespread the problem is
+              rather than what fixing it might be worth. */}
           <div>
-            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground" title={`Savings per 1pp at ${n.driver_site ?? "driver"}`}>
-              Savings/1pp
+            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Over cap
             </div>
-            <div className="tnum mt-0.5 text-[19px] font-semibold text-success">
-              {crore(n.savings_inr_per_pp)}
+            <div
+              className={cn(
+                "tnum mt-0.5 text-[19px] font-semibold",
+                n.sites_over_cap > 0 ? "text-danger" : "text-success",
+              )}
+            >
+              {n.sites_over_cap}
+              <span className="text-[13px] font-medium text-muted-foreground"> of {n.site_count}</span>
             </div>
           </div>
         </div>
@@ -98,11 +91,12 @@ export function ExecutiveSummary({
         {/* wastage-vs-cap meter — fills the space with a real reading */}
         {n.wastage_pct != null && (
           <div>
-            <div className="mb-1 flex items-center justify-between text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
-              <span>Portfolio wastage vs {n.target_wastage_pct.toFixed(0)}% cap</span>
-              <span className={n.wastage_pct > n.target_wastage_pct ? "text-danger" : "text-success"}>
-                {n.wastage_pct > n.target_wastage_pct ? "+" : ""}{(n.wastage_pct - n.target_wastage_pct).toFixed(2)}pp
-              </span>
+            {/* Label only. The signed pp gap that sat on the right restated the
+                two numbers already on screen -- wastage in the strip above, the
+                cap as the marker on the track below -- and the bar overshooting
+                its marker shows the overage without arithmetic. */}
+            <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+              Portfolio wastage vs {n.target_wastage_pct.toFixed(0)}% cap
             </div>
             <div className="relative h-2 overflow-hidden rounded-full bg-muted">
               <div
